@@ -14,6 +14,16 @@ sudo apt-get install python3-pip
 ```bash
 sudo apt-get install python3-venv
 ```
+4. Install SQLite3 by running the following command:
+```bash
+sudo apt-get install sqlite3
+```
+5. Check that you have installed all the dependencies by running the following commands:
+```bash
+python3 --version
+pip3 --version
+sqlite3 --version
+```
 Once you have installed all the dependencies, you can continue with the next steps to run the project.
 --- 
 #### Creating a virtual environment
