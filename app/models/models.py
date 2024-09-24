@@ -28,7 +28,7 @@ class Matches(Base):
                                            uselist=False,
                                            post_update=True)
 
-    # --------------------------------- REPR -------------------------#
+    # --------------------------------- REPR --------------------------------#
     def __repr__(self):
         return (f"Match(id={self.id!r}, match_name={self.match_name!r}, "
                 f"started={self.started!r}, is_public={self.is_public!r}, "
@@ -47,7 +47,7 @@ class Players(Base):
     turn_order: Mapped[int]
     match_id: Mapped[int] = mapped_column(ForeignKey('matches.id'))
 
-    # --------------------------------- REPR -------------------------------#
+    # --------------------------------- RElATIONSHIP -------------------------------#
     match: Mapped["Matches"] = relationship(
         "Matches", back_populates="players", foreign_keys=[match_id], post_update=True)
     shape_cards: Mapped[List["ShapeCards"]] = relationship(

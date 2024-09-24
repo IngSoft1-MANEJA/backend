@@ -1,11 +1,12 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-#from config import DATABASE_FILENAME
+
+from app.config import DATABASE_FILENAME
 
 
 # Configuración de la base de datos
-engine = create_engine(f'sqlite:///database_switcher.sqlite', echo=True)
+engine = create_engine(f'sqlite:///{DATABASE_FILENAME}', echo=True)
 Base = declarative_base()
 
 # Crea una sesión

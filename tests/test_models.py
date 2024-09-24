@@ -66,16 +66,15 @@ def test_relationships(db: Session):
     db.refresh(movement_card)
 
     # Verificar las relaciones
-    # match.players es una lista de jugadores
     assert match.players[0].id == player.id
     # player.match es el match al que pertenece el jugador
     assert player.match.id == match.id
-    assert match.board.id == board.id  # match.board es el tablero del match
+    assert match.board.id == board.id
     # board.match es el match al que pertenece el tablero
     assert board.match.id == match.id
     # tile.board es el tablero al que pertenece la ficha
     assert tile.board.id == board.id
-    assert board.tiles[0].id == tile.id  # board.tiles es una lista de fichas
+    assert board.tiles[0].id == tile.id 
     assert shape_card.owner.id == player.id
     assert movement_card.owner.id == player.id
     assert player.shape_cards[0].id == shape_card.id
