@@ -15,6 +15,17 @@ class ConnectionManager:
         """
         self._games[game_id] = {}
 
+    @staticmethod
+    async def keep_alive(websocket: WebSocket):
+        """Keeps websocket connections alive
+
+        Args:
+            websocket: connection to keep alive.
+        """
+
+        while True:
+            await websocket.receive_text()
+
     def connect_player_to_game(self, game_id: int, player_id: int, websocket: WebSocket):
         """Connects players to game and saves the connections.
 
