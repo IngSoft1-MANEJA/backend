@@ -7,12 +7,6 @@ router = APIRouter(prefix="/matches")
 
 manager = ConnectionManager()
 
-@router.get("/ws/")
-def alo():
-    print("AAAA")
-    return {"MATCHES": "World"}
-
-
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket):
     await websocket.accept()
