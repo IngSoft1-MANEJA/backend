@@ -1,7 +1,7 @@
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
 from typing import Any, Dict 
 
-from exceptions import *
+from app.exceptions import *
 
 class ConnectionManager:
     def __init__(self) -> None:

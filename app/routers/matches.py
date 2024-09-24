@@ -1,16 +1,21 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException
 
-from exceptions import *
-from connection_manager import ConnectionManager
+from app.exceptions import *
+from app.connection_manager import ConnectionManager
 
-router = APIRouter(prefix="/matches/")
+router = APIRouter(prefix="/matches")
 
 manager = ConnectionManager()
+
+@router.get("/ws/")
+def alo():
+    print("AAAA")
+    return {"MATCHES": "World"}
+
 
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket):
     await websocket.accept()
-
     try:
         try:
             manager.connect_player_to_game(game_id, player_id, websocket)
