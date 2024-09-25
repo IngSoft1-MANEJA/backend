@@ -2,6 +2,10 @@ from fastapi import FastAPI, WebSocket
 from app.routers import matches
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.database import init_db
+
+init_db()
+
 app = FastAPI()
 
 origins = ["*"]

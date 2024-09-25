@@ -88,8 +88,7 @@ class Boards(Base):
     @validates('ban_color')
     def validate_ban_color(self, key, color):
         if color not in Colors.__members__:
-            raise ValueError(f"Color {color} is not a valid color to ban, must be one of {
-                             Colors.__members__}")
+            raise ValueError(f"Color {color} is not a valid color to ban, must be one of {Colors.__members__}")
         return color
 
     # --------------------------------- REPR -------------------------------#
@@ -151,8 +150,7 @@ class ShapeCards(Base):
     def __repr__(self):
         return (f"ShapeCard(id={self.id!r}, name={self.name!r}, "
                 f"shape_type={self.shape_type!r}, is_hard={self.is_hard!r}, "
-                f"is_visible={self.is_visible!r}, is_blocked={
-                    self.is_blocked!r}, "
+                f"is_visible={self.is_visible!r}, is_blocked={self.is_blocked!r}, "
                 f"player_owner={self.player_owner!r})")
 
 # ================================================ MOVEMENTCARDS MODELS ===========================#
