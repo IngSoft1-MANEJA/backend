@@ -1,15 +1,14 @@
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
 from models.models import Matches
 from database import engine
 
-Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 class MatchService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Matches:
         Metodos disponibles:
+            -  __init__
             - create_match
             - get_match_by_id
             - get_all_matches
@@ -17,7 +16,10 @@ class MatchService:
             - delete_match (El cliente desea que no se eliminen matches, pero se puede agregar)
     """
 
-    def create_match(self, name: str, max_players: int, is_public: bool):
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_match(self, db:Session, name: str, max_players: int, is_public: bool):
         """
             Crea un nuevo match en la database.
             
@@ -28,17 +30,15 @@ class MatchService:
             Returns:
                 Matches: el objeto match creado.
         """
-        session = Session()
-        try:
-            match = Matches(match_name=name, max_players=max_players, 
-                            is_public=True, is_started=False, amount_players=0)
-            session.add(match)
-            session.commit()
-            session.refresh(match)
-        finally:
-            session.close()
+        
+        match = Matches(match_name=name, max_players=max_players, 
+                        is_public=True, is_started=False, amount_players=0)
+        db.add(match)
+        db.commit()
+        db.refresh(match)
+      
     
-    def get_match_by_id(self, match_id: int):        
+    def get_match_by_id(self, db:Session, match_id: int):        
         """
             Obtiene un match segun el id dado.
             
@@ -47,17 +47,16 @@ class MatchService:
             Returns:
                 Atributos del match en formato de diccionario.
         """
-        session = Session()
+    
         try:
-            match = session.query(Matches).filter(Matches.id == match_id).one()
+            match = db.query(Matches).filter(Matches.id == match_id).one()
             return {'id ': match.id, 'name': match.match_name, 'max_players': match.max_players,
                     'is_public': match.is_public, 'is_started': match.is_started}
         except NoResultFound:
             raise NoResultFound(f"Match with id {match_id} not found, can't get")
-        finally:
-            session.close()
+        
             
-    def get_all_matches(self, available: bool = False):
+    def get_all_matches(self, db:Session, available: bool = False):
         """
             Obtiene la lista de todos los matches, si se quiere obtener solo los disponibles
             se debe pasar el parametro available como True.
@@ -67,19 +66,16 @@ class MatchService:
             Returns:
                 Matches: Lista de matches.
         """
-        session = Session()
         try:
             if available:
-                matches = session.query(Matches).filter(Matches.is_started == False and Matches.max_players < 4).all()
+                matches = db.query(Matches).filter(Matches.is_started == False and Matches.max_players < 4).all()
             else:
-                matches = session.query(Matches).all()
+                matches = db.query(Matches).all()
             return matches
         except NoResultFound:
             raise NoResultFound("No matches found")
-        finally:
-            session.close()
     
-    def update_match(self, match_id: int, is_started: bool, new_amount_players: int):
+    def update_match(self, db:Session, match_id: int, is_started: bool, new_amount_players: int):
         """
             Actualiza los atributos de un match en la database.
             
@@ -90,15 +86,13 @@ class MatchService:
             Returns:
                 Matches: el objeto match actualizado.
         """
-        session = Session()
         try:
-            match = session.query(Matches).filter(Matches.id == match_id).one()
+            match = db.query(Matches).filter(Matches.id == match_id).one()
             match.is_started = is_started
             match.amount_players = new_amount_players
-            session.commit()
-            session.refresh(match)
+            db.commit()
+            db.refresh(match)
             return match
         except NoResultFound:
             raise NoResultFound(f"Match with id {match_id} not found, can't update")
-        finally:
-            session.close()
+    

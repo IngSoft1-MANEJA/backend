@@ -1,4 +1,4 @@
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
 from models.models import Boards
@@ -7,18 +7,21 @@ from models.enums import Colors
 
 from app.exceptions import *
 
-session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 class BoardService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Boards
-    Metodos:- create_board
+    Metodos:
+            - __init__
+            - create_board
             - get_all_boards
             - get_board_by_id
             - update_ban_color
             - delete_board
     """
-    def create_board(self, match_id : int):
+    def __init__(self, db):
+        self.db = db
+
+    def create_board(self, db: Session, match_id : int):
         """
         Crea un nuevo tablero en la base de datos.
         Args:
@@ -27,20 +30,20 @@ class BoardService:
             new_board: Tablero creado.
         """
         new_board = Boards(match_id=match_id)
-        session.add(new_board)
-        session.commit()
+        db.add(new_board)
+        db.commit()
         return new_board
     
-    def get_all_boards(self) -> List[Boards]:
+    def get_all_boards(self, db: Session) -> List[Boards]:
         """
         Obtiene todos los tableros de la base de datos.
         Returns:
             boards: Lista de tableros.
         """
-        boards = session.query(Boards).all()
+        boards = db.query(Boards).all()
         return boards
 
-    def get_board_by_id(self, board_id : int) -> Boards:
+    def get_board_by_id(self, db:Session, board_id : int) -> Boards:
         """
         Obtiene un tablero de la base de datos por su id.
         Args:
@@ -48,10 +51,10 @@ class BoardService:
         Returns:
             board: Tablero.
         """
-        board = session.query(Boards).filter(Boards.id == board_id).one()
+        board = db.query(Boards).filter(Boards.id == board_id).one()
         return board
 
-    def update_ban_color(self, board_id : int, ban_color : str):
+    def update_ban_color(self, db:Session, board_id : int, ban_color : str):
         """
         Actualiza el color del ban de un tablero.
         Args:
@@ -62,16 +65,16 @@ class BoardService:
         if ban_color not in Colors.__members__: 
             raise ColorNotAvailable(ban_color)
         
-        board = session.query(Boards).filter(Boards.id == board_id).one()
+        board = db.query(Boards).filter(Boards.id == board_id).one()
         board.ban_color = ban_color
-        session.commit()
+        db.commit()
     
-    def delete_board(self, board_id : int):
+    def delete_board(self, db:Session, board_id : int):
         """
         Elimina un tablero de la base de datos.
         Args:
             board_id: Id del tablero.
         """
-        board = session.query(Boards).filter(Boards.id == board_id).one()
-        session.delete(board)
-        session.commit()
+        board = db.query(Boards).filter(Boards.id == board_id).one()
+        db.delete(board)
+        db.commit()
