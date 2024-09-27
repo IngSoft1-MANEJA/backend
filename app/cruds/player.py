@@ -1,16 +1,14 @@
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
 from models.models import Players
 from database import engine
 
-# Crear una sesion para interactuar con la base de datos
-Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 class PlayerService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Matches
-    Metodos: 
+    Metodos:
+        - __init__ 
         - create_player
         - get_players
         - get_player_by_id
@@ -18,7 +16,10 @@ class PlayerService:
         - update_turn_order
         - delete_player
     """
-    def create_player(self, name : str):
+    def __init__(self, db: Session):
+        self.db = db
+
+    def create_player(self, db: Session,name : str):
         """
             Crea una nueva instancia de jugador en la base de datos.
             
@@ -27,17 +28,14 @@ class PlayerService:
             Returns:
                 player: el objeto player creado.
         """
-        session = Session()
-        try:
-            player = Players(name=name)
-            session.add(player)
-            session.commit()
-            session.refresh(player)
-            return player
-        finally:
-            session.close()
+
+        player = Players(name=name)
+        db.add(player)
+        db.commit()
+        db.refresh(player)
+        return player
         
-    def get_players(self) -> List[Players]:
+    def get_players(self, db: Session) -> List[Players]:
         """
             Obtiene la lista de todos los jugadores.
             
@@ -46,15 +44,11 @@ class PlayerService:
             Returns:
                 Players: Lista de players.
         """
-        session = Session()
-        try:
-            players = session.query(Players).all()
-            return players
-        finally:
-            session.close()
-
-
-    def get_player_by_id(self, player_id : int):
+        
+        players = db.query(Players).all()
+        return players
+    
+    def get_player_by_id(self, db: Session, player_id : int):
         """
             Obtiene un jugador segun su id.
             
@@ -63,18 +57,15 @@ class PlayerService:
             Returns:
                 player: El jugador con el id propuesto.
         """
-        session = Session()
         try:
-            player = session.query(Players).filter(player_id == Players.id).first()
+            player = db.query(Players).filter(player_id == Players.id).first()
             return player
   
         except NoResultFound:
             raise ValueError("No player with that id")
 
-        finally:
-            session.close()
 
-    def delete_player(self, player_id : int):
+    def delete_player(self, db: Session, player_id : int):
         """
             Elimina un jugador segun su id.
             
@@ -83,17 +74,14 @@ class PlayerService:
             Returns:
                 none.
         """
-        session = Session()
         try:
-            player = session.query(Players).filter(Players.id == player_id).first()
-            session.delete(player)
-            session.commit()
+            player = db.query(Players).filter(Players.id == player_id).first()
+            db.delete(player)
+            db.commit()
         except NoResultFound:
             raise ValueError("No player with that id")
-        finally:
-            session.close()
             
-    def update_player_with_match(self, player_id : int, match_id : int):
+    def update_player_with_match(self, db: Session, player_id : int, match_id : int):
         """
             Asocia un jugador a una partida.
             
@@ -103,17 +91,14 @@ class PlayerService:
             Returns:
                 none.
         """
-        session = Session()
         try:
-            player = session.query(Players).filter(Players.id == player_id).first()
+            player = db.query(Players).filter(Players.id == player_id).first()
             player.match_id = match_id
-            session.commit()
+            db.commit()
         except NoResultFound:
             raise ValueError("No player with that id")
-        finally:
-            session.close()
             
-    def update_turn_order(self, turn_order : int):
+    def update_turn_order(self, db: Session, id: int, turn_order : int):
         """
             Actualiza el orden de turno de los jugadores.
             
@@ -121,17 +106,16 @@ class PlayerService:
                 turn_order : nuevo orden de turno.
             Returns:
                 none.
-        """
-        session = Session()
+        """        
         try:
-            players = session.query(Players).all()
-            for player in players:
-                player.turn_order = turn_order
-            session.commit()
-        finally:
-            session.close()
+            player = db.query(Players).filter(Players.id == id).first()
+            player.turn_order = id
+            db.commit()
+        except NoResultFound:
+            raise ValueError("No player with that id")
+       
 
-    def get_user_turn_order(self, id: int) -> int:
+    def get_user_turn_order(self, db: Session, id: int) -> int:
         """
             Obtiene el orden de turno actual.
             
@@ -140,9 +124,6 @@ class PlayerService:
             Returns:
                 turn_order: orden de turno.
         """
-        session = Session()
-        try:
-            player = session.query(Players).filter(Players.id == id).first()
-            return player.turn_order
-        finally:
-            session.close()
+        player = db.query(Players).filter(Players.id == id).first()
+        return player.turn_order
+    
