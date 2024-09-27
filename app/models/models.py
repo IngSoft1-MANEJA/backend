@@ -14,9 +14,8 @@ class Matches(Base):
     match_name: Mapped[str] = mapped_column(String(50))
     started: Mapped[bool]
     is_public: Mapped[bool]
+    amount_players: Mapped[int]
     max_players: Mapped[int]
-    current_player_turn = Column(
-        Integer, ForeignKey('players.id'), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     players: Mapped[List["Players"]] = relationship("Players", back_populates="match",
@@ -77,7 +76,10 @@ class Boards(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     ban_color: Mapped[str] = mapped_column(String(50), nullable=False)  #
     match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
-
+    current_player_turn = Column(
+        Integer, ForeignKey('players.id'), nullable=True)
+    next_player_turn = Column(
+        Integer, ForeignKey('players.id'), nullable=True)
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship(
         "Matches", back_populates="board", lazy='joined', post_update=True)
