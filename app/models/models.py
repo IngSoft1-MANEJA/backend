@@ -6,9 +6,9 @@ from sqlalchemy import Column, String, Integer, Boolean, ForeignKey
 
 # ================================================ MATCHES MODELS =================================#
 
-
 class Matches(Base):
     __tablename__ = 'matches'
+    __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     match_name: Mapped[str] = mapped_column(String(50))
@@ -35,31 +35,27 @@ class Matches(Base):
 
 # ================================================ PLAYERS MODELS =================================#
 
-
 class Players(Base):
     __tablename__ = 'players'
+    __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     player_name: Mapped[str] = mapped_column(String(50))
     is_owner: Mapped[bool]
     session_token: Mapped[str]
-    turn_order: Mapped[int]
+    turn_order: Mapped[int] = mapped_column(nullable=True)
     match_id: Mapped[int] = mapped_column(ForeignKey('matches.id'))
 
-    # --------------------------------- RElATIONSHIP -------------------------------#
-    match: Mapped["Matches"] = relationship(
-        "Matches", back_populates="players", foreign_keys=[match_id], post_update=True)
-    shape_cards: Mapped[List["ShapeCards"]] = relationship(
-        "ShapeCards", back_populates="owner", post_update=True)
-    movement_cards: Mapped[List["MovementCards"]] = relationship(
-        "MovementCards", back_populates="owner", post_update=True)
+    # --------------------------------- RELATIONSHIPS -----------------------#
+    match: Mapped["Matches"] = relationship("Matches", back_populates="players", foreign_keys=[match_id], post_update=True)
+    shape_cards: Mapped[List["ShapeCards"]] = relationship("ShapeCards", back_populates="owner", post_update=True)
+    movement_cards: Mapped[List["MovementCards"]] = relationship("MovementCards", back_populates="owner", post_update=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('turn_order')
     def validate_turn_order(self, key, turn_order):
         if turn_order < 1 or turn_order > 4:
-            raise ValueError(
-                f"Turn order {turn_order} is not valid: must be between 1 and 4")
+            raise ValueError(f"Turn order {turn_order} is not valid: must be between 1 and 4")
         return turn_order
 
     # --------------------------------- REPR -------------------------------#
@@ -67,24 +63,21 @@ class Players(Base):
         return (f"Player(id={self.id!r}, player_name={self.player_name!r}, "
                 f"is_owner={self.is_owner!r}, match_id={self.match_id!r})")
 
-# ================================================ BOARDS MODELS ==================================#
-
+# ================================================ BOARDS MODELS =================================#
 
 class Boards(Base):
     __tablename__ = 'boards'
+    __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    ban_color: Mapped[str] = mapped_column(String(50), nullable=False)  #
+    ban_color: Mapped[str] = mapped_column(String(50), nullable=False)
     match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
-    current_player_turn = Column(
-        Integer, ForeignKey('players.id'), nullable=True)
-    next_player_turn = Column(
-        Integer, ForeignKey('players.id'), nullable=True)
+    current_player_turn = Column(Integer, ForeignKey('players.id'), nullable=True)
+    next_player_turn = Column(Integer, ForeignKey('players.id'), nullable=True)
+
     # --------------------------------- RELATIONSHIPS -----------------------#
-    match: Mapped["Matches"] = relationship(
-        "Matches", back_populates="board", lazy='joined', post_update=True)
-    tiles: Mapped[List["Tiles"]] = relationship(
-        "Tiles", back_populates="board", post_update=True)
+    match: Mapped["Matches"] = relationship("Matches", back_populates="board", lazy='joined', post_update=True)
+    tiles: Mapped[List["Tiles"]] = relationship("Tiles", back_populates="board", post_update=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('ban_color')
@@ -99,9 +92,9 @@ class Boards(Base):
 
 # ================================================ TILES MODELS ===================================#
 
-
 class Tiles(Base):
     __tablename__ = 'tiles'
+    __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(primary_key=True)
     color: Mapped[Colors]
@@ -111,7 +104,7 @@ class Tiles(Base):
     board: Mapped["Boards"] = relationship("Boards", back_populates="tiles")
 
     # --------------------------------- VALIDATORS -------------------------#
-    @validates('PositionX', 'PositionY')
+    @validates('positionX', 'positionY')
     def validate_position(self, key, position):
         if position < 0 or position > 5:
             raise ValueError(f"Position {position} is out of bounds")
@@ -125,21 +118,19 @@ class Tiles(Base):
 
 # ================================================ SHAPECARDS MODELS ==============================#
 
-
 class ShapeCards(Base):
     __tablename__ = 'shapeCards'
+    __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     shape_type: Mapped[str]
     is_hard: Mapped[bool]
     is_visible: Mapped[bool]
     is_blocked: Mapped[bool]
-    player_owner: Mapped[int] = mapped_column(
-        Integer, ForeignKey('players.id'))
+    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
-    owner: Mapped["Players"] = relationship(
-        "Players", back_populates="shape_cards", post_update=True)
+    owner: Mapped["Players"] = relationship("Players", back_populates="shape_cards", post_update=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('shape_type')
@@ -150,24 +141,22 @@ class ShapeCards(Base):
 
     # -------------------------------- REPR -------------------------------#
     def __repr__(self):
-        return (f"ShapeCard(id={self.id!r}, name={self.name!r}, "
-                f"shape_type={self.shape_type!r}, is_hard={self.is_hard!r}, "
-                f"is_visible={self.is_visible!r}, is_blocked={self.is_blocked!r}, "
-                f"player_owner={self.player_owner!r})")
+        return (f"ShapeCard(id={self.id!r}, shape_type={self.shape_type!r}, "
+                f"is_hard={self.is_hard!r}, is_visible={self.is_visible!r}, "
+                f"is_blocked={self.is_blocked!r}, player_owner={self.player_owner!r})")
 
 # ================================================ MOVEMENTCARDS MODELS ===========================#
 
-
 class MovementCards(Base):
-    __tablename__ = 'movementCards'  # Cambiado a minúsculas
+    __tablename__ = 'movementCards'
+    __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     mov_type: Mapped[str]
     player_owner: Mapped[int] = mapped_column(ForeignKey('players.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
-    owner: Mapped["Players"] = relationship(
-        "Players", back_populates="movement_cards", post_update=True)
+    owner: Mapped["Players"] = relationship("Players", back_populates="movement_cards", post_update=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('mov_type')
@@ -178,7 +167,6 @@ class MovementCards(Base):
 
     # --------------------------------- REPR -------------------------------#
     def __repr__(self):
-        return (f"MovementCard(id={self.id!r}, name={self.name!r}, "
-                f"mov_type={self.mov_type!r}, player_owner={self.player_owner!r})")
+        return (f"MovementCard(id={self.id!r}, mov_type={self.mov_type!r}, player_owner={self.player_owner!r})")
 
 # =================================================================================================#
