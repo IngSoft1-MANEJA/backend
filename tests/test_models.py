@@ -28,7 +28,7 @@ def test_create_tables(db: Session):
 def test_relationships(db: Session):
     # creo un match
     match = Matches(match_name="Test Match", started=False,
-                    is_public=True, max_players=4, current_player_turn=1)
+                    is_public=True, max_players=4, amount_players=0)
     db.add(match)
     db.commit()
     db.refresh(match)
@@ -42,7 +42,7 @@ def test_relationships(db: Session):
     db.refresh(player)
 
     # creo un tablero
-    board = Boards(ban_color="red", match_id=match.id)
+    board = Boards(ban_color="red", match_id=match.id, current_player_turn=player.id)
     db.add(board)
     db.commit()
     db.refresh(board)
