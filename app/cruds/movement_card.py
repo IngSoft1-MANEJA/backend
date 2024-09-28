@@ -16,7 +16,13 @@ class MovementCardService:
         - delete_movement_card
         - delete_movement_card_from_user
     """
-    def create_movement_card(self, db:Session, movement : str, color : str):
+    def __init__(self, db: Session):
+        """ Constructor de la clase, guardamos en el atributo
+            db: La session de la base de datos."""
+        self.db = db
+        
+        
+    def create_movement_card(self, movement : str, color : str):
         """
             Crea una nueva instancia de carta de movimiento en la base de datos.
             
@@ -27,12 +33,12 @@ class MovementCardService:
                 movement_card: el objeto movement_card creado.
         """
         movement_card = MovementCards(movement=movement, color=color)
-        db.add(movement_card)
-        db.commit()
-        db.refresh(movement_card)
-        return movement_card
+        self.db.add(movement_card)
+        self.db.commit()
+        self.db.refresh(movement_card)
         
-    def get_movement_cards(self, db: Session) -> List[MovementCards]:
+    
+    def get_movement_cards(self) -> List[MovementCards]:
         """
             Obtiene la lista de todas las cartas de movimiento.
             
@@ -41,11 +47,11 @@ class MovementCardService:
             Returns:
                 MovementCards: Lista de movement_cards.
         """
-        movement_cards = db.query(MovementCards).all()
+        movement_cards = self.db.query(MovementCards).all()
         return movement_cards
     
     
-    def get_movement_card_by_id(self, db:Session, movement_card_id : int):
+    def get_movement_card_by_id(self, movement_card_id : int):
         """
             Obtiene una carta de movimiento segun su id.
             
@@ -53,12 +59,13 @@ class MovementCardService:
                 movement_card_id : Id de la carta a buscar
         """
         try:
-            movement_card = db.query(MovementCards).filter(MovementCards.id == movement_card_id).one()
+            movement_card = self.db.query(MovementCards).filter(MovementCards.id == movement_card_id).one()
             return movement_card
         except NoResultFound:
             raise NoResultFound(f"Movement card with id {movement_card_id} not found, can't get")
         
-    def get_movement_card_by_user(self, db:Session, user_id : int) -> List[MovementCards]:
+        
+    def get_movement_card_by_user(self, user_id : int) -> List[MovementCards]:
         """
             Obtiene la lista de cartas de movimiento de un usuario.
             
@@ -67,12 +74,11 @@ class MovementCardService:
             Returns:
                 MovementCards: Lista de movement_cards.
         """
-  
-        movement_cards = db.query(MovementCards).filter(MovementCards.user_id == user_id).all()
+        movement_cards = self.db.query(MovementCards).filter(MovementCards.user_id == user_id).all()
         return movement_cards
 
             
-    def delete_movement_card(self, db:Session, movement_card_id : int):
+    def delete_movement_card(self, movement_card_id : int):
         """
             Elimina una carta de movimiento segun su id.
             
@@ -82,13 +88,14 @@ class MovementCardService:
                 none.
         """
         try:
-            movement_card = db.query(MovementCards).filter(MovementCards.id == movement_card_id).first()
-            db.delete(movement_card)
-            db.commit()
+            movement_card = self.db.query(MovementCards).filter(MovementCards.id == movement_card_id).first()
+            self.db.delete(movement_card)
+            self.db.commit()
         except NoResultFound:
             raise ValueError("No movement card with that id")
     
-    def delete_movement_card_from_user(self, db:Session, user_id : int):
+    
+    def delete_movement_card_from_user(self, user_id : int):
         """
             Elimina todas las cartas de movimiento de un usuario.
             
@@ -98,10 +105,10 @@ class MovementCardService:
                 none.
         """
         try:
-            movement_cards = db.query(MovementCards).filter(MovementCards.user_id == user_id).all()
+            movement_cards = self.db.query(MovementCards).filter(MovementCards.user_id == user_id).all()
             for movement_card in movement_cards:
-                db.delete(movement_card)
-            db.commit()
+                self.db.delete(movement_card)
+            self.db.commit()
         except NoResultFound:
             raise ValueError("No movement cards for that user")
   

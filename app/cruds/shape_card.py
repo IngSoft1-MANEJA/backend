@@ -18,7 +18,12 @@ class ShapeCardService:
         - update_shape_card
         
     """
-    def create_shape_card(self, db:Session, shape : str, color : str):
+    def __init__(self, db: Session):
+        """ Constructor de la clase, guardamos en el atributo
+            db: La session de la base de datos."""
+        self.db = db
+        
+    def create_shape_card(self, shape : str, color : str):
         """
             Crea una nueva instancia de carta de figura en la base de datos.
             
@@ -30,13 +35,12 @@ class ShapeCardService:
         """
    
         shape_card = ShapeCards(shape=shape, color=color)
-        db.add(shape_card)
-        db.commit()
-        db.refresh(shape_card)
-        return shape_card
+        self.db.add(shape_card)
+        self.db.commit()
+        self.db.refresh(shape_card)
 
         
-    def get_shape_cards(self, db:Session) -> List[ShapeCards]:
+    def get_shape_cards(self) -> List[ShapeCards]:
         """
             Obtiene la lista de todas las cartas de figura.
             
@@ -46,11 +50,11 @@ class ShapeCardService:
                 ShapeCards: Lista de shape_cards.
         """
  
-        shape_cards = db.query(ShapeCards).all()
+        shape_cards = self.db.query(ShapeCards).all()
         return shape_cards
 
     
-    def get_shape_card_by_id(self, db:Session, shape_card_id : int):
+    def get_shape_card_by_id(self, shape_card_id : int):
         """
             Obtiene una carta de figura segun su id.
             
@@ -58,13 +62,13 @@ class ShapeCardService:
                 shape_card_id : Id de la carta de forma a buscar
         """
         try:
-            shape_card = db.query(ShapeCards).filter(ShapeCards.id == shape_card_id).one()
+            shape_card = self.db.query(ShapeCards).filter(ShapeCards.id == shape_card_id).one()
             return shape_card
         except NoResultFound:
             raise NoResultFound(f"ShapeCard with id {shape_card_id} not found, can't get")
 
             
-    def get_shape_card_by_user(self, db:Session, user_id : int):
+    def get_shape_card_by_user(self, user_id : int):
         """
             Obtiene las cartas de figura de un usuario.
             
@@ -72,12 +76,12 @@ class ShapeCardService:
                 user_id : Id del usuario del que se quieren obtener las cartas.
         """
         try: 
-            shapes_cards = db.query(ShapeCards).filter(ShapeCards.player_owner == user_id).all()
+            shapes_cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == user_id).all()
             return shapes_cards
         except NoResultFound:
             raise NoResultFound(f"The user with id {user_id} has no shape cards")
             
-    def delete_shape_card(self, db:Session, shape_card_id : int):
+    def delete_shape_card(self, shape_card_id : int):
         """
             Elimina una carta de figura segun su id.
             
@@ -85,13 +89,13 @@ class ShapeCardService:
                 shape_card_id : Id de la carta de figura a eliminar
         """
         try:
-            shape_card = db.query(ShapeCards).filter(ShapeCards.id == shape_card_id).one()
-            db.delete(shape_card)
-            db.commit()
+            shape_card = self.db.query(ShapeCards).filter(ShapeCards.id == shape_card_id).one()
+            self.db.delete(shape_card)
+            self.db.commit()
         except NoResultFound:
             raise NoResultFound(f"ShapeCard with id {shape_card_id} not found, can't delete")
             
-    def delete_shape_card_from_user(self, db:Session, user_id : int, shape_card_id: int):
+    def delete_shape_card_from_user(self, user_id : int, shape_card_id: int):
         """
             Elimina una carta de figura de un usuario.
             
@@ -100,15 +104,15 @@ class ShapeCardService:
                 shape_card_id : Id de la carta de forma a eliminar.
         """
         try:
-            shape_card = db.query(ShapeCards).filter(ShapeCards.player_owner == user_id and ShapeCards.id == shape_card_id).one()
-            db.delete(shape_card)
-            db.commit()
+            shape_card = self.db.query(ShapeCards).filter(ShapeCards.player_owner == user_id and ShapeCards.id == shape_card_id).one()
+            self.db.delete(shape_card)
+            self.db.commit()
         except NoResultFound:
             raise NoResultFound(f"ShapeCard with id {shape_card_id} not found, can't delete")
         except ValueError:
             raise ValueError(f"The user with id {user_id} has no shape cards")
             
-    def update_shape_card(self, db:Session, shape_card_id : int, is_visible : bool, is_blocked: bool):
+    def update_shape_card(self, shape_card_id : int, is_visible : bool, is_blocked: bool):
         """
             Actualiza los atributos de una carta de figura.
             
@@ -118,10 +122,10 @@ class ShapeCardService:
                 is_blocked : Bloqueo de la carta.
         """
         try:
-            shape_card = db.query(ShapeCards).filter(ShapeCards.id == shape_card_id).one()
+            shape_card = self.db.query(ShapeCards).filter(ShapeCards.id == shape_card_id).one()
             shape_card.is_visible = is_visible
             shape_card.is_blocked = is_blocked
-            db.commit()
+            self.db.commit()
         except NoResultFound:
             raise NoResultFound(f"ShapeCard with id {shape_card_id} not found, can't update")
 
