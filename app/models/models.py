@@ -7,15 +7,28 @@ from sqlalchemy import Column, String, Integer, Boolean, ForeignKey
 # ================================================ MATCHES MODELS =================================#
 
 class Matches(Base):
+    """
+        Model of the Matches table in the database.
+        Attributes:
+            - id: int, primary key.
+            - match_name: str, name of the match.
+            - started: bool, if the match has started.
+            - is_public: bool, if the match is public.
+            - amount_players: int, amount of players in the match.
+            - max_players: int, maximum amount of players in the match.
+        Relationships:
+            - players: List[Players], list of players in the match.
+            - board: Boards, the board of the match.
+    """
     __tablename__ = 'matches'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     match_name: Mapped[str] = mapped_column(String(50))
-    started: Mapped[bool]
-    is_public: Mapped[bool]
-    amount_players: Mapped[int]
-    max_players: Mapped[int]
+    started: Mapped[bool] = mapped_column(Boolean)
+    is_public: Mapped[bool] = mapped_column(Boolean)
+    amount_players: Mapped[int] = mapped_column(Integer)
+    max_players: Mapped[int] = mapped_column(Integer)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     players: Mapped[List["Players"]] = relationship("Players", back_populates="match",
@@ -36,15 +49,29 @@ class Matches(Base):
 # ================================================ PLAYERS MODELS =================================#
 
 class Players(Base):
+    """
+        Model of the Players table in the database.
+        Attributes:
+            - id: int, primary key.
+            - player_name: str, name of the player.
+            - is_owner: bool, if the player is the owner of the match.
+            - session_token: str, token of the player.
+            - turn_order: int, order of the player's turn.
+            - match_id: int, foreign key to the match the
+        Relationships:
+            - match: Matches, relationship to the match the player is in.
+            - shape_cards: List[ShapeCards], relationship to the shape cards the player has.
+            - movement_cards: List[MovementCards], relationship to the movement cards the player has.
+    """
     __tablename__ = 'players'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     player_name: Mapped[str] = mapped_column(String(50))
-    is_owner: Mapped[bool]
-    session_token: Mapped[str]
-    turn_order: Mapped[int] = mapped_column(nullable=True)
-    match_id: Mapped[int] = mapped_column(ForeignKey('matches.id'))
+    is_owner: Mapped[bool] = mapped_column(Boolean)
+    session_token: Mapped[str] = mapped_column(String)
+    turn_order: Mapped[int] = mapped_column(Integer, nullable=True)
+    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship("Matches", back_populates="players", foreign_keys=[match_id], post_update=True)
@@ -66,14 +93,26 @@ class Players(Base):
 # ================================================ BOARDS MODELS =================================#
 
 class Boards(Base):
+    """
+        Model of the Boards table in the database.
+        Attributes:
+            - id: int, primary key.
+            - ban_color: str, color banned in the match.
+            - match_id: int, foreign key to the match.
+            - current_player_turn: int, foreign key to the current player's turn.
+            - next_player_turn: int, foreign key to the next player's turn.
+        Relationships:
+            - match: Matches, relationship to the match the board is in.
+            - tiles: List[Tiles], relationship to the tiles in the board.
+    """
     __tablename__ = 'boards'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    ban_color: Mapped[str] = mapped_column(String(50), nullable=False)
+    ban_color: Mapped[str] = mapped_column(String(50), nullable=True)
     match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
-    current_player_turn = Column(Integer, ForeignKey('players.id'), nullable=True)
-    next_player_turn = Column(Integer, ForeignKey('players.id'), nullable=True)
+    current_player_turn: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable=True)
+    next_player_turn: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship("Matches", back_populates="board", lazy='joined', post_update=True)
@@ -93,14 +132,27 @@ class Boards(Base):
 # ================================================ TILES MODELS ===================================#
 
 class Tiles(Base):
+    """
+        Model of the Tiles table in the database.
+        Attributes:
+            - id: int, primary key.
+            - color: str, color of the tile.
+            - positionX: int, x position of the tile.
+            - positionY: int, y position of the tile.
+            - board_id: int, foreign key to the board.
+        Relationships:
+            - board: Boards, relationship to the board the tile is in.
+    """
     __tablename__ = 'tiles'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
-    id: Mapped[int] = mapped_column(primary_key=True)
-    color: Mapped[Colors]
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    color: Mapped[Colors] = mapped_column(String)
     positionX: Mapped[int] = mapped_column(Integer)
     positionY: Mapped[int] = mapped_column(Integer)
     board_id: Mapped[int] = mapped_column(Integer, ForeignKey('boards.id'))
+
+    # --------------------------------- RELATIONSHIPS -----------------------#
     board: Mapped["Boards"] = relationship("Boards", back_populates="tiles")
 
     # --------------------------------- VALIDATORS -------------------------#
@@ -109,6 +161,12 @@ class Tiles(Base):
         if position < 0 or position > 5:
             raise ValueError(f"Position {position} is out of bounds")
         return position
+    
+    @validates('color')
+    def validate_color(self, key, color):
+        if color not in Colors.__members__:
+            raise ValueError(f"Color {color} is not a valid color")
+        return color
 
     # --------------------------------- REPR -------------------------------#
     def __repr__(self):
@@ -119,14 +177,26 @@ class Tiles(Base):
 # ================================================ SHAPECARDS MODELS ==============================#
 
 class ShapeCards(Base):
+    """
+        Model of the ShapeCards table in the database.
+        Attributes:
+            - id: int, primary key.
+            - shape_type: str, shape of the card.
+            - is_hard: bool, if the card is hard.
+            - is_visible: bool, if the card is visible.
+            - is_blocked: bool, if the card is blocked.
+            - player_owner: int, foreign key to the player that owns the card.
+        Relationships:
+            - owner: Players, relationship to the player that owns the card.
+    """
     __tablename__ = 'shapeCards'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    shape_type: Mapped[str]
-    is_hard: Mapped[bool]
-    is_visible: Mapped[bool]
-    is_blocked: Mapped[bool]
+    shape_type: Mapped[str] = mapped_column(String)
+    is_hard: Mapped[bool] = mapped_column(Boolean)
+    is_visible: Mapped[bool] = mapped_column(Boolean)
+    is_blocked: Mapped[bool] = mapped_column(Boolean)
     player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
@@ -148,12 +218,21 @@ class ShapeCards(Base):
 # ================================================ MOVEMENTCARDS MODELS ===========================#
 
 class MovementCards(Base):
+    """
+        Model of the MovementCards table in the database.
+        Attributes:
+            - id: int, primary key.
+            - mov_type: str, movement of the card.
+            - player_owner: int, foreign key to the player that owns the card.
+        Relationships:
+            - owner: Players, relationship to the player that owns the card.
+    """
     __tablename__ = 'movementCards'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    mov_type: Mapped[str]
-    player_owner: Mapped[int] = mapped_column(ForeignKey('players.id'))
+    mov_type: Mapped[str] = mapped_column(String)
+    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     owner: Mapped["Players"] = relationship("Players", back_populates="movement_cards", post_update=True)

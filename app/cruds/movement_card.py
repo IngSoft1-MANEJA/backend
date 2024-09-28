@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
-from models.models import MovementCards
-from database import engine
+from app.models.models import MovementCards
+from app.database import engine
 
 class MovementCardService:
     """
@@ -36,7 +36,7 @@ class MovementCardService:
         self.db.add(movement_card)
         self.db.commit()
         self.db.refresh(movement_card)
-        
+        return movement_card
     
     def get_movement_cards(self) -> List[MovementCards]:
         """

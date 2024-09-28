@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
-from models.models import ShapeCards
-from database import engine
+from app.models.models import ShapeCards
+from app.database import engine
 
 class ShapeCardService:
     """
@@ -38,7 +38,7 @@ class ShapeCardService:
         self.db.add(shape_card)
         self.db.commit()
         self.db.refresh(shape_card)
-
+        return shape_card
         
     def get_shape_cards(self) -> List[ShapeCards]:
         """

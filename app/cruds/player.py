@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
 from app.models.models import Players
+from app.utils.utils import validate_player_name
 
 class PlayerService:
     """
@@ -9,6 +10,7 @@ class PlayerService:
     Metodos:
         - __init__ 
         - create_player
+        - get_player_id
         - get_players
         - get_player_by_id
         - get_user_turn_order
@@ -32,12 +34,24 @@ class PlayerService:
             Returns:
                 player: el objeto player creado.
         """
+        validate_player_name(name)
         player = Players(player_name=name, match_id=match_to_link, is_owner=owner, session_token=token)
         self.db.add(player)
         self.db.commit()
         self.db.refresh(player)
         return player
     
+    
+    def get_player_id(self, player: Players) -> int:
+        """
+            Obtiene el id del jugador pasado por parametro.
+            
+            Args:
+                player: Objeto jugador.
+            Returns:
+                player_id: id del jugador.
+        """
+        return player.id
         
     def get_players(self) -> List[Players]:
         """
@@ -58,13 +72,20 @@ class PlayerService:
             Args:
                 player_id: Id del jugador a buscar.
             Returns:
-                player: El jugador con el id propuesto.
+                Atributos del jugador en formato de diccionario.
         """
         try:
             player = self.db.query(Players).filter(Players.id == player_id).first()
             if player is None:
                 raise NoResultFound
-            return player
+            return {
+                'id': player.id,
+                'player_name': player.player_name,
+                'match_id': player.match_id,
+                'is_owner': player.is_owner,
+                'session_token': player.session_token,
+                'turn_order': player.turn_order
+            }
         except NoResultFound:
             raise ValueError("No player with that id")
 

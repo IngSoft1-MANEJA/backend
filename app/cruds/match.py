@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
 from app.models.models import Matches
+import app.utils.utils as utils
 
 class MatchService:
     """
@@ -9,6 +10,7 @@ class MatchService:
         Metodos disponibles:
             -  __init__
             - create_match
+            - get_match_id
             - get_match_by_id
             - get_all_matches
             - update_match
@@ -32,14 +34,17 @@ class MatchService:
             Returns:
                 Matches: el objeto match creado.
         """
-        
-        match = Matches(match_name=name, max_players=max_players, 
-                        is_public=public, started=False, amount_players=0)
-        self.db.add(match)
-        self.db.commit()
-        self.db.refresh(match)
-        return match
-    
+        try:
+            utils.validate_match_name(name)
+            utils.validate_max_players(max_players)
+            match = Matches(match_name=name, max_players=max_players, 
+                            is_public=public, started=False, amount_players=0)
+            self.db.add(match)
+            self.db.commit()
+            self.db.refresh(match)
+            return match
+        except Exception as e:
+            raise e
     
     def get_match_by_id(self, match_id: int):        
         """
@@ -53,11 +58,27 @@ class MatchService:
     
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
-            return {'id': match.id, 'name': match.match_name, 'max_players': match.max_players,
-                    'is_public': match.is_public, 'is_started': match.is_started}
+            return {
+                'id': match.id,
+                'match_name': match.match_name,
+                'started': match.started,
+                'is_public': match.is_public,
+                'max_players': match.max_players,
+                'amount_players': match.amount_players
+            }
         except NoResultFound:
             raise NoResultFound(f"Match with id {match_id} not found, can't get")
         
+    def get_match_id(self, match: Matches):
+        """
+            Obtiene el id de un match.
+            
+            Args:
+                match: objeto match.
+            Returns:
+                int: id del match.
+        """
+        return match.id       
             
     def get_all_matches(self, available: bool = False):
         """
@@ -88,14 +109,33 @@ class MatchService:
                 is_started: si el match ha comenzado.
                 new_amount_players: nueva cantidad de jugadores.
             Returns:
-                Matches: el objeto match actualizado.
+                No Returns.
         """
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
             match.is_started = is_started
             match.amount_players = new_amount_players
+            self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
-            return match
         except NoResultFound:
             raise NoResultFound(f"Match with id {match_id} not found, can't update")
+        
+# El cliente no desea eliminar matches, pero lo dejamos ya hecho
+    def delete_match(self, match_id: int):
+        """
+            Elimina un match de la database.
+            
+            Args:
+                match_id: id del match a eliminar.
+            Returns:
+                No Returns.
+        """
+        try:
+            match = self.db.query(Matches).filter(Matches.id == match_id).one()
+            self.db.delete(match)
+            self.db.commit()
+        except NoResultFound:
+            raise NoResultFound(f"Match with id {match_id} not found, can't delete")
+        except Exception as e:
+            raise e

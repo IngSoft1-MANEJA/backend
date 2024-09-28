@@ -1,11 +1,7 @@
-from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
-from models.models import Boards
-from database import engine
-from models.enums import Colors
-
-from app.exceptions import *
+from app.models.models import Boards
+from app.utils.utils import validate_color
 
 class BoardService:
     """
@@ -63,9 +59,7 @@ class BoardService:
             board_id: Id del tablero.
             ban_color: Color del ban.
         """
-    
-        if ban_color not in Colors.__members__: 
-            raise ColorNotAvailable(ban_color)
+        validate_color(ban_color)
         
         board = self.db.query(Boards).filter(Boards.id == board_id).one()
         board.ban_color = ban_color
