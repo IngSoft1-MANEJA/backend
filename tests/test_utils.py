@@ -21,7 +21,7 @@ def test_validate_turn_equal():
     next_player_turn = 1
     board_id = 1
     with pytest.raises(TurnsAreEqual):
-        validate_turn(board_id, current_player, next_player_turn)
+        validate_turn(current_player, next_player_turn, board_id)
 
 def test_validate_turn_different():
     # Prueba cuando current_player y next_player_turn son diferentes
@@ -29,7 +29,7 @@ def test_validate_turn_different():
     next_player_turn = 2
     board_id = 1
     try:
-        validate_turn(board_id, current_player, next_player_turn)
+        validate_turn(current_player, next_player_turn, board_id)
     except TurnsAreEqual:
         pytest.fail("validate_turn raised TurnsAreEqual unexpectedly!")
 
@@ -39,7 +39,7 @@ def test_validate_turn_edge_case_zero():
     next_player_turn = 0
     board_id = 1
     with pytest.raises(TurnsAreEqual):
-        validate_turn(board_id, current_player, next_player_turn)
+        validate_turn(current_player, next_player_turn, board_id)
 
 def test_validate_turn_edge_case_negative():
     # Prueba con el caso límite cuando current_player y next_player_turn son negativos
@@ -47,4 +47,4 @@ def test_validate_turn_edge_case_negative():
     next_player_turn = -1
     board_id = 1
     with pytest.raises(TurnsAreEqual):
-        validate_turn(board_id, current_player, next_player_turn)
+        validate_turn(current_player, next_player_turn, board_id)
