@@ -1,6 +1,6 @@
 from app.database import Base
 from typing import List
-from .enums import Colors, Shapes, Movements
+from .enums import Colors, Shapes, Movements, MatchState
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from sqlalchemy import Column, String, Integer, Boolean, ForeignKey
 
@@ -12,8 +12,7 @@ class Matches(Base):
         Attributes:
             - id: int, primary key.
             - match_name: str, name of the match.
-            - started: bool, if the match has started.
-            - is_public: bool, if the match is public.
+            - state: Enum State, indicates the state of the match.
             - amount_players: int, amount of players in the match.
             - max_players: int, maximum amount of players in the match.
         Relationships:
@@ -25,7 +24,7 @@ class Matches(Base):
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     match_name: Mapped[str] = mapped_column(String(50))
-    started: Mapped[bool] = mapped_column(Boolean)
+    state: Mapped[str]
     is_public: Mapped[bool] = mapped_column(Boolean)
     amount_players: Mapped[int] = mapped_column(Integer)
     max_players: Mapped[int] = mapped_column(Integer)
@@ -40,10 +39,16 @@ class Matches(Base):
                                            uselist=False,
                                            post_update=True)
 
+    # --------------------------------- VALIDATORS -------------------------#
+    @validates('state')
+    def validate_state(self, key, state):
+        if state not in MatchState._value2member_map_.keys():
+            raise ValueError(f"State {state} is not a valid state")
+        return state
     # --------------------------------- REPR --------------------------------#
     def __repr__(self):
         return (f"Match(id={self.id!r}, match_name={self.match_name!r}, "
-                f"started={self.started!r}, is_public={self.is_public!r}, "
+                f"state={self.state!r}, is_public={self.is_public!r}, "
                 f"max_players={self.max_players!r})")
 
 # ================================================ PLAYERS MODELS =================================#
@@ -121,8 +126,8 @@ class Boards(Base):
     # --------------------------------- VALIDATORS -------------------------#
     @validates('ban_color')
     def validate_ban_color(self, key, color):
-        if color not in Colors.__members__:
-            raise ValueError(f"Color {color} is not a valid color to ban, must be one of {Colors.__members__}")
+        if color not in Colors._value2member_map_.keys():
+            raise ValueError(f"Color {color} is not a valid color to ban, must be one of {Colors._value2member_map_.keys()}")
         return color
 
     # --------------------------------- REPR -------------------------------#
@@ -164,7 +169,7 @@ class Tiles(Base):
     
     @validates('color')
     def validate_color(self, key, color):
-        if color not in Colors.__members__:
+        if color not in Colors._value2member_map_:
             raise ValueError(f"Color {color} is not a valid color")
         return color
 
@@ -193,10 +198,10 @@ class ShapeCards(Base):
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    shape_type: Mapped[str] = mapped_column(String)
-    is_hard: Mapped[bool] = mapped_column(Boolean)
-    is_visible: Mapped[bool] = mapped_column(Boolean)
-    is_blocked: Mapped[bool] = mapped_column(Boolean)
+    shape_type: Mapped[int] # mapeamos int para identificar las cartas
+    is_hard: Mapped[bool]
+    is_visible: Mapped[bool]
+    is_blocked: Mapped[bool]
     player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
@@ -205,7 +210,7 @@ class ShapeCards(Base):
     # --------------------------------- VALIDATORS -------------------------#
     @validates('shape_type')
     def validate_shape(self, key, shape):
-        if shape not in Shapes.__members__:
+        if shape not in Shapes._value2member_map_.keys():
             raise ValueError(f"Shape {shape} is not valid shape type")
         return shape
 
@@ -231,7 +236,7 @@ class MovementCards(Base):
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    mov_type: Mapped[str] = mapped_column(String)
+    mov_type: Mapped[str]
     player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable = True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
@@ -240,7 +245,7 @@ class MovementCards(Base):
     # --------------------------------- VALIDATORS -------------------------#
     @validates('mov_type')
     def validate_movement(self, key, movement):
-        if movement not in Movements.__members__:
+        if movement not in Movements._value2member_map_:
             raise ValueError(f"Movement {movement} is not valid mov type")
         return movement
 

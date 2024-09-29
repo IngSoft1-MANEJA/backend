@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
 from app.models.models import Matches
+from app.models.enums import MatchState
 import app.utils.utils as utils
 
 class MatchService:
@@ -38,7 +39,7 @@ class MatchService:
             utils.validate_match_name(name)
             utils.validate_max_players(max_players)
             match = Matches(match_name=name, max_players=max_players, 
-                            is_public=public, started=False, amount_players=0)
+                            is_public=public, state = MatchState.WAITING.value, amount_players=0)
             self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
@@ -61,7 +62,7 @@ class MatchService:
             return {
                 'id': match.id,
                 'match_name': match.match_name,
-                'started': match.started,
+                'state': match.state,
                 'is_public': match.is_public,
                 'max_players': match.max_players,
                 'amount_players': match.amount_players
@@ -92,7 +93,7 @@ class MatchService:
         """
         try:
             if available:
-                matches = self.db.query(Matches).filter(Matches.is_started == False, Matches.max_players < 4).all()
+                matches = self.db.query(Matches).filter(Matches.state == MatchState.WAITING.value, Matches.max_players < 4).all()
             else:
                 matches = self.db.query(Matches).all()
             return matches
@@ -100,20 +101,20 @@ class MatchService:
             raise NoResultFound("No matches found")
     
     
-    def update_match(self, match_id: int, is_started: bool, new_amount_players: int):
+    def update_match(self, match_id: int, new_state: str, new_amount_players: int):
         """
             Actualiza los atributos de un match en la database.
             
             Args:
                 match_id: id del match a actualizar.
-                is_started: si el match ha comenzado.
+                new_state: si el match ha comenzado.
                 new_amount_players: nueva cantidad de jugadores.
             Returns:
                 No Returns.
         """
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
-            match.is_started = is_started
+            match.state = new_state
             match.amount_players = new_amount_players
             self.db.add(match)
             self.db.commit()
