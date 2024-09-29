@@ -32,10 +32,10 @@ class BoardService:
             validate_color(ban_color)
             new_board.ban_color = ban_color
         if current_player:
-            validate_turn(current_player, next_player_turn)
+            validate_turn(current_player, next_player_turn, new_board.id)
             new_board.current_player = current_player
         if next_player_turn:
-            validate_turn(current_player, next_player_turn)
+            validate_turn(current_player, next_player_turn, new_board.id)
             new_board.next_player_turn = next_player_turn
     
         self.db.add(new_board)
@@ -93,7 +93,7 @@ class BoardService:
         Args:
             board_id: Id del tablero.
         """
-        validate_turn(current_player, next_player_turn)
+        validate_turn(current_player, next_player_turn, board_id)
         board = self.db.query(Boards).filter(Boards.id == board_id).one()
         board.current_player = board.next_player_turn
         self.db.commit()
