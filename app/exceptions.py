@@ -173,11 +173,6 @@ class TurnsAreEqual(SwitcherException):
         super().init(message)
         
 # ========================= Cruds TileService Exceptions ========================
-class TileNotCreated(SwitcherException):
-    def __init__(self, name: str):
-        message: str = f"Tile {name} not created, error creating tile"
-        super().__init__(message)
-
 class TileNotFound(SwitcherException):
     def __init__(self, tile_id: int):
         message: str = f"Tile with id {tile_id} not found, can't get"

@@ -40,6 +40,11 @@ def test_create_tile_invalid_position(tile_service : TileService, session):
     with pytest.raises(e.TilePositionIsInvalid):
         tile_service.create_tile(board_id=1, color="red", position_x=6, position_y=3)
 
+def test_get_all_tiles_empty(tile_service : TileService, session):
+    assert session.query(Tiles).count() == 0
+    with pytest.raises(e.NoTilesFound):
+        tile_service.get_all_tiles()
+
 def test_get_all_tiles(tile_service : TileService, session):
     before = session.query(Tiles).count() 
     tile1 = tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)

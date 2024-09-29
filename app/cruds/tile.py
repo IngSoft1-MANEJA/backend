@@ -2,7 +2,7 @@ from sqlalchemy.exc import NoResultFound
 from typing import List
 from app.models.models import Tiles
 from app.utils.utils import validate_color, validate_position
-from app.exceptions import TileNotFound
+from app.exceptions import TileNotFound, NoTilesFound
 
 class TileService:
     """
@@ -43,8 +43,9 @@ class TileService:
             tiles: Lista de fichas.
         """
         tiles = self.db.query(Tiles).all()
+        if not tiles:
+            raise NoTilesFound()
         return tiles
-
     def get_tile_by_id(self, tile_id : int) -> Tiles:
         """
         Obtiene una ficha de la base de datos por su id.
