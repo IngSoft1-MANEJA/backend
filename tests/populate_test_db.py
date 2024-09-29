@@ -6,7 +6,6 @@ from app.models.models import Matches, Players, Boards, Tiles, ShapeCards, Movem
 # Configuración de la sesión
 Session = sessionmaker(bind=engine)
 
-
 def load_data_for_test():
     #============================= List of matches =============================
     list_matches = [
@@ -69,7 +68,7 @@ def load_data_for_test():
     try:
         for match in list_matches:
             new_match = Matches(match_name=match['name'], max_players=match['max_players'],
-                                is_public=match['public'], started=False, amount_players=0)
+                                is_public=match['public'], started=False, current_players=1)
             session.add(new_match)
             session.commit()
         for player in list_players:

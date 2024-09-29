@@ -18,3 +18,10 @@ def init_db():
 def delete_db():
     Base.metadata.drop_all(bind=engine)
     print("Database deleted")
+    
+def get_db():
+    db = run_session
+    try:
+        yield db
+    finally:
+        db.close()

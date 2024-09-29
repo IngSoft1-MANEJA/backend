@@ -5,6 +5,6 @@ run-tests_crud:
 
 run-test_endpoints: # Run all tests ENDPOINTS to Database
 	ENVIRONMENT=test python tests/populate_test_db.py
-	pytest -m end2end_test -vv
+	pytest -m endpoints -vv
 	rm database_test.sqlite
 	unset ENVIRONMENT

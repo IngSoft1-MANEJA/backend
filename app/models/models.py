@@ -13,7 +13,7 @@ class Matches(Base):
             - id: int, primary key.
             - match_name: str, name of the match.
             - state: Enum State, indicates the state of the match.
-            - amount_players: int, amount of players in the match.
+            - current_players: int, amount of players in the match.
             - max_players: int, maximum amount of players in the match.
         Relationships:
             - players: List[Players], list of players in the match.
@@ -26,7 +26,7 @@ class Matches(Base):
     match_name: Mapped[str] = mapped_column(String(50))
     state: Mapped[str]
     is_public: Mapped[bool] = mapped_column(Boolean)
-    amount_players: Mapped[int] = mapped_column(Integer)
+    current_players: Mapped[int] = mapped_column(Integer)
     max_players: Mapped[int] = mapped_column(Integer)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
