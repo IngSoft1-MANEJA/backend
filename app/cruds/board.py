@@ -1,7 +1,7 @@
 from sqlalchemy.exc import NoResultFound
 from typing import List
 from app.models.models import Boards
-from app.utils.utils import validate_color
+from app.utils.utils import validate_color, validate_turn, validate_board
 
 class BoardService:
     """
@@ -19,7 +19,7 @@ class BoardService:
             db: La session de la base de datos."""
         self.db = db
 
-    def create_board(self, match_id : int):
+    def create_board(self, match_id : int, ban_color : str = None, current_player : int = None, next_player_turn : int = None):
         """
         Crea un nuevo tablero en la base de datos.
         Args:
@@ -28,6 +28,16 @@ class BoardService:
             new_board: Tablero creado.
         """
         new_board = Boards(match_id=match_id)
+        if ban_color:
+            validate_color(ban_color)
+            new_board.ban_color = ban_color
+        if current_player:
+            validate_turn(current_player, next_player_turn)
+            new_board.current_player = current_player
+        if next_player_turn:
+            validate_turn(current_player, next_player_turn)
+            new_board.next_player_turn = next_player_turn
+    
         self.db.add(new_board)
         self.db.commit()
         return new_board
@@ -50,6 +60,7 @@ class BoardService:
             board: Tablero.
         """
         board = self.db.query(Boards).filter(Boards.id == board_id).one()
+        validate_board(board.id)
         return board
 
     def update_ban_color(self, board_id : int, ban_color : str):
@@ -72,5 +83,17 @@ class BoardService:
             board_id: Id del tablero.
         """
         board = self.db.query(Boards).filter(Boards.id == board_id).one()
+        validate_board(board.id)
         self.db.delete(board)
+        self.db.commit()
+        
+    def update_turn(self, board_id : int, current_player : int, next_player_turn : int):
+        """
+        Actualiza el turno de los jugadores.
+        Args:
+            board_id: Id del tablero.
+        """
+        validate_turn(current_player, next_player_turn)
+        board = self.db.query(Boards).filter(Boards.id == board_id).one()
+        board.current_player = board.next_player_turn
         self.db.commit()
