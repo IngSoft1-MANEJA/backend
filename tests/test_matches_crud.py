@@ -5,6 +5,7 @@ from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.models.models import Matches, Players
 import app.exceptions as e
+from app.models.enums import MatchState
 
 # Configuración de la sesión
 Session = sessionmaker(bind=engine)
@@ -44,7 +45,7 @@ def test_get_matches(match_service: MatchService):
         ]
         for match in list_matches:
             new_match = Matches(match_name=match['name'], max_players=match['max_players'], 
-                    is_public=match['public'], started=False, amount_players=0)
+                    is_public=match['public'], state=MatchState.WAITING.value, amount_players=0)
             session2.add(new_match)
             session2.commit()
         matches2 = match_service.get_all_matches()
@@ -93,7 +94,7 @@ def test_get_match_by_id(match_service: MatchService, session):
     print(match2['id'])
     assert match2['id'] == match_id
     assert match2['match_name'] == match.match_name
-    assert match2['started'] == match.started
+    assert match2['state'] == match.state
     assert match2['is_public'] == match.is_public
     assert match2['max_players'] == match.max_players
     assert match2['amount_players'] == match.amount_players
@@ -103,12 +104,8 @@ def test_update_match(match_service: MatchService, session):
     # Obtener el ID del match recién creado
     match_id = match_service.get_match_id(match)
     # Actualizar el match
-    match_service.update_match(match_id, is_started= False, new_amount_players= 2)
+    match_service.update_match(match_id, new_state= MatchState.WAITING.value, new_amount_players= 2)
     # chequeo que el match se haya actualizado
     match_info = match_service.get_match_by_id(match_id)
     assert match_info['amount_players'] == 2
-    assert match_info['started'] == False
-    
-#================================================ PLAYER SERVICE TESTS ================================================
-    
-# ================================================= TILE SERVICE TESTS =================================================
+    assert match_info['state'] == MatchState.WAITING.value

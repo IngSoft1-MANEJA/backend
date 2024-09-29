@@ -4,7 +4,9 @@ from app.database import engine, Init_Session, init_db, delete_db
 from app.cruds.shape_card import ShapeCardService
 from app.cruds.player import PlayerService
 from app.models.models import ShapeCards
+from app.models.enums import Shapes
 import app.exceptions as e
+
 
 # Configuración de la sesión
 Session = sessionmaker(bind=engine)
@@ -38,8 +40,8 @@ def test_get_shape_cards(shape_service: ShapeCardService):
     try:
         session2 = Session()
         list_shape_cards = [
-            {'shape_type': 'circle', 'hard': False, 'visible': True, 'blocked': False, 'player_owner': 1},
-            {'shape_type': 'square', 'hard': True, 'visible': False, 'blocked': False, 'player_owner': 2}
+            {'shape_type': 1, 'hard': False, 'visible': True, 'blocked': False, 'player_owner': 1},
+            {'shape_type': 3, 'hard': True, 'visible': False, 'blocked': False, 'player_owner': 2}
         ]
         for shape_card in list_shape_cards:
             new_shape_card = ShapeCards(shape_type=shape_card['shape_type'], is_hard=shape_card['hard'],
@@ -53,7 +55,7 @@ def test_get_shape_cards(shape_service: ShapeCardService):
         
 def test_create_shape_card(shape_service: ShapeCardService, session):
     number_shape_cards = session.query(ShapeCards).count()
-    shape_service.create_shape_card(shape='circle', 
+    shape_service.create_shape_card(shape=5, 
                                     is_hard=False, is_visible=True, 
                                     player_owner=1)
     try:
@@ -65,12 +67,12 @@ def test_create_shape_card(shape_service: ShapeCardService, session):
 
 def test_create_shape_card_raises_exception(shape_service: ShapeCardService, session):
     with pytest.raises(e.ShapeNotValid):
-        shape_service.create_shape_card(shape='octagono', 
+        shape_service.create_shape_card(shape=20, 
                                         is_hard=False, is_visible=True, 
                                         player_owner=1)
 
 def test_get_shape_card_by_id(shape_service: ShapeCardService, session):
-    shape_card = shape_service.create_shape_card(shape='circle', 
+    shape_card = shape_service.create_shape_card(shape=5, 
                                     is_hard=False, is_visible=True, 
                                     player_owner=1)
     shape_card_id = shape_service.get_shape_card_id(shape_card)
@@ -78,7 +80,7 @@ def test_get_shape_card_by_id(shape_service: ShapeCardService, session):
     assert shape_card == shape_card2
     
 def test_update_shape_card(shape_service: ShapeCardService, session):
-    shape_card = shape_service.create_shape_card(shape='circle', 
+    shape_card = shape_service.create_shape_card(shape=15, 
                                     is_hard=False, is_visible=True, 
                                     player_owner=1)
     shape_card_id = shape_service.get_shape_card_id(shape_card)
@@ -89,7 +91,7 @@ def test_update_shape_card(shape_service: ShapeCardService, session):
     assert shape_card2.is_blocked == True
 
 def test_delete_shape_card(shape_service: ShapeCardService, session):
-    shape_card = shape_service.create_shape_card(shape='circle', 
+    shape_card = shape_service.create_shape_card(shape=1, 
                                     is_hard=False, is_visible=True, 
                                     player_owner=1)
     number_shape_cards = session.query(ShapeCards).count()
@@ -103,7 +105,7 @@ def test_delete_shape_card(shape_service: ShapeCardService, session):
         session2.close()
 
 def test_add_shape_card_to_player(shape_service: ShapeCardService, session):
-    shape_card = shape_service.create_shape_card(shape='circle', 
+    shape_card = shape_service.create_shape_card(shape=3, 
                                     is_hard=False, is_visible=True, 
                                     player_owner=1)
     shape_card_id = shape_service.get_shape_card_id(shape_card)
@@ -115,7 +117,7 @@ def test_add_shape_card_to_player(shape_service: ShapeCardService, session):
     assert shape_card2.player_owner == player_id
     
 def test_get_shape_cards_by_player(shape_service: ShapeCardService, session):
-    shape_card = shape_service.create_shape_card(shape='circle', 
+    shape_card = shape_service.create_shape_card(shape=3, 
                                     is_hard=False, is_visible=True, 
                                     player_owner=1)
     player_service = PlayerService(session)
@@ -128,7 +130,7 @@ def test_get_shape_cards_by_player(shape_service: ShapeCardService, session):
     assert shape_cards[0] == shape_card
     assert shape_cards[0].player_owner == player_id
     assert shape_cards[0].id == shape_card_id
-    assert shape_cards[0].shape_type == 'circle'
+    assert shape_cards[0].shape_type == 3
     assert shape_cards[0].is_hard == False
     assert shape_cards[0].is_visible == True
     assert shape_cards[0].is_blocked == False
