@@ -232,7 +232,7 @@ class MovementCards(Base):
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     mov_type: Mapped[str] = mapped_column(String)
-    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'))
+    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable = True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     owner: Mapped["Players"] = relationship("Players", back_populates="movement_cards", post_update=True)

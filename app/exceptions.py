@@ -197,3 +197,19 @@ class ShapeCardHandIsFull(SwitcherException):
     def __init__(self, player_id: int):
         message: str = f"Player with id: {player_id} hand is full, can't add more shape cards"
         super().__init__(message)
+        
+# ========================= Cruds MovementCardService Exceptions ========================
+class MoveNotValid(SwitcherException):
+    def __init__(self, movement: str):
+        message: str = f"Movement {movement} is not valid"
+        super().__init__(message)
+
+class MovementCardNotFound(SwitcherException):
+    def __init__(self, movement_card_id: int):
+        message: str = f"Movement card with id {movement_card_id} not found, can't get"
+        super().__init__(message)
+
+class NoMovementCardsFound(SwitcherException):
+    def __init__(self, player_owner: int):
+        message: str = "No movement cards found with player id {player_owner}"
+        super().__init__(message)
