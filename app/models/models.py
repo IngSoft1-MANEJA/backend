@@ -148,15 +148,15 @@ class Tiles(Base):
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     color: Mapped[Colors] = mapped_column(String)
-    positionX: Mapped[int] = mapped_column(Integer)
-    positionY: Mapped[int] = mapped_column(Integer)
+    position_x: Mapped[int] = mapped_column(Integer)
+    position_y: Mapped[int] = mapped_column(Integer)
     board_id: Mapped[int] = mapped_column(Integer, ForeignKey('boards.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     board: Mapped["Boards"] = relationship("Boards", back_populates="tiles")
 
     # --------------------------------- VALIDATORS -------------------------#
-    @validates('positionX', 'positionY')
+    @validates('position_x', 'position_y')
     def validate_position(self, key, position):
         if position < 0 or position > 5:
             raise ValueError(f"Position {position} is out of bounds")

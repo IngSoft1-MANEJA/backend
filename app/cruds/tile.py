@@ -2,6 +2,7 @@ from sqlalchemy.exc import NoResultFound
 from typing import List
 from app.models.models import Tiles
 from app.utils.utils import validate_color, validate_position
+from app.exceptions import TileNotFound
 
 class TileService:
     """
@@ -30,7 +31,7 @@ class TileService:
         """
         validate_color(color)
         validate_position(position_x, position_y)
-        new_tile = Tiles(board_id=board_id, color=color, positionX = position_x, positionY = position_y)
+        new_tile = Tiles(board_id=board_id, color=color, position_x = position_x, position_y = position_y)
         self.db.add(new_tile)
         self.db.commit()
         return new_tile
@@ -52,21 +53,25 @@ class TileService:
         Returns:
             tile: Ficha.
         """
-        tile = self.db.query(Tiles).filter(Tiles.id == tile_id).one()
-        return tile
+        try:
+            tile = self.db.query(Tiles).filter(Tiles.id == tile_id).one()
+            return tile
+        except NoResultFound:
+            raise TileNotFound(tile_id)
 
-    def update_tile_position(self, tile_id : int, positionX: int, positionY: int):
+    def update_tile_position(self, tile_id : int, position_x: int, position_y: int):
         """
         Actualiza el color de una ficha.
         Args:
             tile_id: Id de la ficha.
             color: Color de la ficha.
         """
-        validate_position(positionX, positionY)
+        validate_position(position_x, position_y)
         tile = self.db.query(Tiles).filter(Tiles.id == tile_id).one()
-        tile.positionX = positionX
-        tile.positionY = positionY
+        tile.position_x = position_y
+        tile.position_y = position_x
         self.db.commit()
+        self.db.refresh(tile)
 
     def delete_tile(self, tile_id : int):
         """
