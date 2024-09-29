@@ -40,20 +40,20 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
 
 @router.get("/", response_model=list[MatchOut])
 def get_matches(db: Session = Depends(get_db)):
-    match_service = MatchService(db)
-    matches = match_service.get_all_matches(available=True)
-    if matches:
-        return matches
-    raise HTTPException(status_code=404, detail="No matches found")
+    try:
+        match_service = MatchService(db)
+        matches = match_service.get_all_matches(available=True)
+    except:
+        raise HTTPException(status_code=404, detail="No matches found")
 
 
 @router.get("/{match_id}", response_model=MatchOut)
 def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
-    match_service = MatchService(db)
-    match = match_service.get_match_by_id(match_id)
-    if match:
-        return match
-    raise HTTPException(status_code=404, detail="Match not found")
+    try:
+        match_service = MatchService(db)
+        match = match_service.get_match_by_id(match_id)
+    except:
+        raise HTTPException(status_code=404, detail="Match not found")
 
 @router.post("/")
 def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
@@ -63,3 +63,4 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match1 = match_service.create_match(match.name, match.max_players, match.is_public)
     new_player = player_service.create_player(match.player_name, match1.id, True , match.token)
     return {"player_id": new_player.id, "match_id": match1.id}
+
