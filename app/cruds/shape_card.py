@@ -3,6 +3,7 @@ from sqlalchemy.exc import NoResultFound
 from typing import List
 from app.models.models import ShapeCards
 from app.database import engine
+from app.utils.utils import validate_shape, validate_add_shape_card_to_hand
 
 class ShapeCardService:
     """
@@ -23,18 +24,24 @@ class ShapeCardService:
             db: La session de la base de datos."""
         self.db = db
         
-    def create_shape_card(self, shape : str, color : str):
+    def create_shape_card(self, shape: str, is_hard: bool, is_visible: bool, 
+                          player_owner: int) -> ShapeCards:
         """
             Crea una nueva instancia de carta de figura en la base de datos.
             
             Args:
                 shape: figura de la carta.
                 color: color de la carta.
+                is_hard: si la carta es dificil.
+                is_visible: si la carta es visible.
+                player_owner: id del jugador propietario de la carta.
+                
             Returns:
                 shape_card: el objeto shape_card creado.
         """
-   
-        shape_card = ShapeCards(shape=shape, color=color)
+        validate_shape(shape)
+        shape_card = ShapeCards(shape_type=shape, is_hard=is_hard, is_visible=is_visible, 
+                                is_blocked=False, player_owner=player_owner)
         self.db.add(shape_card)
         self.db.commit()
         self.db.refresh(shape_card)
@@ -53,6 +60,16 @@ class ShapeCardService:
         shape_cards = self.db.query(ShapeCards).all()
         return shape_cards
 
+    def get_shape_card_id(self, shape_card: ShapeCards) -> int:
+        """
+            Obtiene el id de una carta de figura.
+            
+            Args:
+                shape_card: Objeto de carta de figura.
+            Returns:
+                int: Id de la carta de figura.
+        """
+        return shape_card.id
     
     def get_shape_card_by_id(self, shape_card_id : int):
         """
@@ -68,18 +85,18 @@ class ShapeCardService:
             raise NoResultFound(f"ShapeCard with id {shape_card_id} not found, can't get")
 
             
-    def get_shape_card_by_user(self, user_id : int):
+    def get_shape_card_by_player(self, player_id : int) -> List[ShapeCards]:
         """
-            Obtiene las cartas de figura de un usuario.
+            Obtiene las cartas de figura de un jugador.
             
             Args:
                 user_id : Id del usuario del que se quieren obtener las cartas.
         """
         try: 
-            shapes_cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == user_id).all()
+            shapes_cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).all()
             return shapes_cards
         except NoResultFound:
-            raise NoResultFound(f"The user with id {user_id} has no shape cards")
+            raise NoResultFound(f"The user with id {player_id} has no shape cards")
             
     def delete_shape_card(self, shape_card_id : int):
         """
@@ -94,23 +111,24 @@ class ShapeCardService:
             self.db.commit()
         except NoResultFound:
             raise NoResultFound(f"ShapeCard with id {shape_card_id} not found, can't delete")
+    
             
-    def delete_shape_card_from_user(self, user_id : int, shape_card_id: int):
+    def add_shape_card_to_player(self, player_id : int, shape_card_id: int):
         """
-            Elimina una carta de figura de un usuario.
+            Agrega una carta de figura a un usuario.
             
             Args:
-                user_id : Id del usuario del que se quiere eliminar la carta.
-                shape_card_id : Id de la carta de forma a eliminar.
+                user_id : Id del usuario al que se le quiere agregar la carta.
+                shape_card_id : Id de la carta de forma a agregar.
         """
         try:
-            shape_card = self.db.query(ShapeCards).filter(ShapeCards.player_owner == user_id and ShapeCards.id == shape_card_id).one()
-            self.db.delete(shape_card)
+            count_cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).count()
+            validate_add_shape_card_to_hand(player_id,count_cards)
+            shape_card = self.db.query(ShapeCards).filter(ShapeCards.id == shape_card_id).one()
+            shape_card.player_owner = player_id
             self.db.commit()
         except NoResultFound:
-            raise NoResultFound(f"ShapeCard with id {shape_card_id} not found, can't delete")
-        except ValueError:
-            raise ValueError(f"The user with id {user_id} has no shape cards")
+            raise NoResultFound(f"ShapeCard with id {shape_card_id} not found, can't add")
             
     def update_shape_card(self, shape_card_id : int, is_visible : bool, is_blocked: bool):
         """

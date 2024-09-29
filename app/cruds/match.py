@@ -139,3 +139,28 @@ class MatchService:
             raise NoResultFound(f"Match with id {match_id} not found, can't delete")
         except Exception as e:
             raise e
+        
+        
+'''
+Json de respuesta de Listar todas las partidas:
+{
+    {
+        match_id: 1,
+        match_name: "Match 1",
+        is_stated: False,
+        is_public: True,
+        max_players: 4,
+        amount_players: 0
+    },
+    {
+        match_id: 2,
+        match_name: "Match 2",
+        is_stated: False,
+        is_public: False,
+        max_players: 4,
+        amount_players: 1
+    }
+    ...
+}
+
+'''

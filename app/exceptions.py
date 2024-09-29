@@ -158,26 +158,20 @@ class ShapeCardAreAlreadyBlocked(SwitcherException):
 
 # ================== Cruds BoardService Exceptions ==============================
 class BoardNotCreated(SwitcherException):
-    def __init__(self, name: str):
+    def init(self, name: str):
         message: str = f"Board {name} not created, error creating board"
-        super().__init__(message)
+        super().init(message)
 
 class BoardNotFound(SwitcherException):
-    def __init__(self, board_id: int):
+    def init(self, board_id: int):
         message: str = f"Board with id {board_id} not found, can't get"
-        super().__init__(message)
+        super().init(message)
 
-class NoBoardsFound(SwitcherException):
-    def __init__(self):
-        message: str = "No boards found"
-        super().__init__(message)
-
-class BoardCannotBeUpdated(SwitcherException):
-    def __init__(self, board_id: int):
-        message: str = f"Board with id {board_id} cannot be updated"
-        super().__init__(message)
+class TurnsAreEqual(SwitcherException):
+    def init(self, board_id: int):
+        message: str = f"Board with id {board_id} cannot be updated, current player and next player turn are equal"
+        super().init(message)
         
-
 # ========================= Cruds TileService Exceptions ========================
 class TileNotCreated(SwitcherException):
     def __init__(self, name: str):
@@ -202,4 +196,9 @@ class TileCannotBeUpdated(SwitcherException):
 class TilePositionIsInvalid(SwitcherException):
     def __init__(self, positionX: int, positionY: int):
         message: str = f"Tile position ({positionX}, {positionY}) is invalid"
+        super().__init__(message)
+        
+class ShapeCardHandIsFull(SwitcherException):
+    def __init__(self, player_id: int):
+        message: str = f"Player with id: {player_id} hand is full, can't add more shape cards"
         super().__init__(message)
