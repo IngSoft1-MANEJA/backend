@@ -118,4 +118,4 @@ def test_join_match_success():
         response = client.post("/matches/1/", json={"player_name": player_name})
         assert response.status_code == status.HTTP_200_OK
         data = websocket.receive_json()
-        assert data == {"key": "PLAYER_JOIN", "payload": f"Player {player_name} has joined to the match."}
+        assert data == {"key": "PLAYER_JOIN", "payload":{"name": player_name}}
