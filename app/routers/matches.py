@@ -43,6 +43,7 @@ def get_matches(db: Session = Depends(get_db)):
     try:
         match_service = MatchService(db)
         matches = match_service.get_all_matches(available=True)
+        return matches
     except:
         raise HTTPException(status_code=404, detail="No matches found")
 
@@ -60,7 +61,7 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
     
-    match1 = match_service.create_match(match.name, match.max_players, match.is_public)
+    match1 = match_service.create_match(match.lobby_name, match.max_players, match.is_public)
     new_player = player_service.create_player(match.player_name, match1.id, True , match.token)
     return {"player_id": new_player.id, "match_id": match1.id}
 
