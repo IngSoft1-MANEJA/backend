@@ -60,12 +60,12 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
     
-    match1 = match_service.create_match(match.name, match.max_players, match.is_public)
+    match1 = match_service.create_match(match.lobby_name, match.max_players, match.is_public)
     new_player = player_service.create_player(match.player_name, match1.id, True , match.token)
     return {"player_id": new_player.id, "match_id": match1.id}
 
 @router.post("/{match_id}/")
-def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
+async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
@@ -78,12 +78,8 @@ def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session 
         match.current_players = match.current_players + 1
         players = [player.player_name for player in match.players]
         db.commit()
-
+        msg = {"key": "PLAYER_JOIN", "payload": f"Player {player.player_name} has joined to the match."}
+        await manager.broadcast_to_game(match_id, msg)
         return {"player_id": player.id, "players": players}
     except:
         raise HTTPException(status_code=404, detail="Match not found")
-    
-
-    
-
-    
