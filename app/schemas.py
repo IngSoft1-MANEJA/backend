@@ -24,4 +24,9 @@ class MatchCreateOut(MatchOut):
     
     class Config:
         orm_mode = True
-    
+
+class PlayerJoinIn(BaseModel):
+    player_name: str
+
+class PlayerJoinOut(BaseModel):
+    player_id: int

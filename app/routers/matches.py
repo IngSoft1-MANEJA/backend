@@ -6,7 +6,7 @@ from app.exceptions import *
 from app.connection_manager import ConnectionManager
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
-from app.schemas import MatchCreateIn, MatchOut
+from app.schemas import *
 from app.database import get_db
 
 router = APIRouter(prefix="/matches")
@@ -64,3 +64,26 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     new_player = player_service.create_player(match.player_name, match1.id, True , match.token)
     return {"player_id": new_player.id, "match_id": match1.id}
 
+@router.post("/{match_id}/")
+def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
+    try:
+        match_service = MatchService(db)
+        match = match_service.get_match_by_id(match_id)
+
+        if match.current_players >= match.max_players:
+            raise HTTPException(status_code=404, detail="Match is full")
+        
+        player_service = PlayerService(db)
+        player = player_service.create_player(playerJoinIn.player_name, match_id, False, "123")
+        match.current_players = match.current_players + 1
+        players = [player.player_name for player in match.players]
+        db.commit()
+
+        return {"player_id": player.id, "players": players}
+    except:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+
+    
+
+    
