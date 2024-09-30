@@ -39,7 +39,7 @@ class MatchService:
             utils.validate_match_name(name)
             utils.validate_max_players(max_players)
             match = Matches(match_name=name, max_players=max_players, 
-                            is_public=public, state = MatchState.WAITING.value, amount_players=0)
+                            is_public=public, state = MatchState.WAITING.value, current_players=1)
             self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
@@ -59,14 +59,7 @@ class MatchService:
     
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
-            return {
-                'id': match.id,
-                'match_name': match.match_name,
-                'state': match.state,
-                'is_public': match.is_public,
-                'max_players': match.max_players,
-                'amount_players': match.amount_players
-            }
+            return match
         except NoResultFound:
             raise NoResultFound(f"Match with id {match_id} not found, can't get")
         
@@ -115,7 +108,7 @@ class MatchService:
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
             match.state = new_state
-            match.amount_players = new_amount_players
+            match.current_players = new_amount_players
             self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
@@ -140,28 +133,3 @@ class MatchService:
             raise NoResultFound(f"Match with id {match_id} not found, can't delete")
         except Exception as e:
             raise e
-        
-        
-'''
-Json de respuesta de Listar todas las partidas:
-{
-    {
-        match_id: 1,
-        match_name: "Match 1",
-        is_stated: False,
-        is_public: True,
-        max_players: 4,
-        amount_players: 0
-    },
-    {
-        match_id: 2,
-        match_name: "Match 2",
-        is_stated: False,
-        is_public: False,
-        max_players: 4,
-        amount_players: 1
-    }
-    ...
-}
-
-'''

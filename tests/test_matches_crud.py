@@ -45,7 +45,7 @@ def test_get_matches(match_service: MatchService):
         ]
         for match in list_matches:
             new_match = Matches(match_name=match['name'], max_players=match['max_players'], 
-                    is_public=match['public'], state=MatchState.WAITING.value, amount_players=0)
+                    is_public=match['public'], state=MatchState.WAITING.value, current_players=0)
             session2.add(new_match)
             session2.commit()
         matches2 = match_service.get_all_matches()
@@ -91,13 +91,7 @@ def test_get_match_by_id(match_service: MatchService, session):
     # Obtener el match usando el servicio
     match2 = match_service.get_match_by_id(match_id)
     # Verificar que los valores del diccionario devuelto son los esperados
-    print(match2['id'])
-    assert match2['id'] == match_id
-    assert match2['match_name'] == match.match_name
-    assert match2['state'] == match.state
-    assert match2['is_public'] == match.is_public
-    assert match2['max_players'] == match.max_players
-    assert match2['amount_players'] == match.amount_players
+    assert match == match2
     
 def test_update_match(match_service: MatchService, session):
     match = match_service.create_match('Test-Match-Update', 4, public=True)
@@ -107,5 +101,5 @@ def test_update_match(match_service: MatchService, session):
     match_service.update_match(match_id, new_state= MatchState.WAITING.value, new_amount_players= 2)
     # chequeo que el match se haya actualizado
     match_info = match_service.get_match_by_id(match_id)
-    assert match_info['amount_players'] == 2
-    assert match_info['state'] == MatchState.WAITING.value
+    assert match_info.current_players == 2
+    assert match_info.state == MatchState.WAITING.value

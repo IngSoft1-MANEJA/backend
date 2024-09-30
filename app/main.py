@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket
 from app.routers import matches
 from fastapi.middleware.cors import CORSMiddleware
+from tests.populate_test_db import load_data_for_test
 
 from app.database import init_db
 
@@ -18,6 +19,8 @@ app.add_middleware(
     )
 
 app.include_router(matches.router)
+
+load_data_for_test()
 
 @app.get("/")
 def hello_world():
