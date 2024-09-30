@@ -9,6 +9,7 @@ from app.cruds.player import PlayerService
 from app.models.enums import *
 from app.schemas import *
 from app.database import get_db
+from app.utils.utils import validate_player_name
 
 router = APIRouter(prefix="/matches")
 
@@ -58,11 +59,14 @@ def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
 def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
-    
-    new_player = player_service.create_player(match.player_name, match1.id, True , match.token)
+    try:
+        validate_player_name(match.player_name)
+        validate_player_name(match.lobby_name)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid player name")
     match1 = match_service.create_match(match.lobby_name, match.max_players, match.is_public)
-    manager.create_game_connection(match1.id)
-    
+    new_player = player_service.create_player(match.player_name, match1.id, True , match.token)
+    manager.create_game_connection(match1.id)  
     return {"player_id": new_player.id, "match_id": match1.id}
 
 @router.post("/{match_id}")
