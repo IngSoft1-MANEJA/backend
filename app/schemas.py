@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from app.models.models import Matches, Players, Boards, Tiles, ShapeCards, MovementCards 
     
 class MatchCreateIn(BaseModel):
-    name: str
+    lobby_name: str
     is_public: bool
     max_players: int
     player_name: str
