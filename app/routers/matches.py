@@ -3,15 +3,13 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketExceptio
 from sqlalchemy.orm import Session
 
 from app.exceptions import *
-from app.connection_manager import ConnectionManager
+from app.connection_manager import ConnectionManager, manager
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.schemas import *
 from app.database import get_db
 
 router = APIRouter(prefix="/matches")
-
-manager = ConnectionManager()
 
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket):
@@ -62,6 +60,7 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     
     match1 = match_service.create_match(match.lobby_name, match.max_players, match.is_public)
     new_player = player_service.create_player(match.player_name, match1.id, True , match.token)
+    manager.create_game_connection(match1.id)
     return {"player_id": new_player.id, "match_id": match1.id}
 
 @router.post("/{match_id}/")

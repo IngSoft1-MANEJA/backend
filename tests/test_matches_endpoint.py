@@ -111,7 +111,7 @@ def test_get_match_by_id_invalid_id():
     response = client.get("/matches/999999")
     assert response.status_code == 404  # Not Found
 
-def test_joinGame_success():
+def test_join_match_success():
     load_data_for_test()
     manager.create_game_connection(1)
     with client.websocket_connect("/matches/1/ws/1") as websocket:
@@ -120,38 +120,3 @@ def test_joinGame_success():
         assert response.status_code == status.HTTP_200_OK
         data = websocket.receive_json()
         assert data == {"key": "PLAYER_JOIN", "payload": f"Player {player_name} has joined to the match."}
-
-"""
-
-def test_joinGame_failure_gameDoesntExist(client):
-
-    response = client.patch("/games/1/join", json={"playerNickname": "p2"})
-
-    assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert response.json() == {"Error": "Partida 1 no existe."}
-
-
-def test_joinGame_failure_playerAlreadyInGame(client, dataListGames):
-
-    response = client.patch("/games/1/join", json={"playerNickname": "p0"})
-
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert response.json() == {"Error": "Jugador p0 ya se encuentra en la partida 1"}
-
-
-def test_joinGame_failure_gameStarted(client, dataListGames):
-
-    response = client.patch("/games/3/join", json={"playerNickname": "player_test"})
-
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert response.json() == {"Error": "La partida g3 ya esta empezada."}
-
-
-def test_joinGame_failure_gameIsFull(client, dataListGames):
-
-    response = client.patch("/games/2/join", json={"playerNickname": "player_test"})
-
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-    assert response.json() == {"Error": "La partida g2 ya esta llena."}
-
-"""

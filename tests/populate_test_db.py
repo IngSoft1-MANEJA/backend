@@ -23,7 +23,7 @@ def load_data_for_test():
             'token': 'token3', 'turn_order': 1},
         {'name': 'Player 4', 'match_to_link': 2, 'owner': False,
             'token': 'token4', 'turn_order': 2},
-        {'name': 'Player 5', 'match_to_link': 2, 'owner': False,
+        {'name': 'Player 5', 'match_to_link': 3, 'owner': False,
             'token': 'token5', 'turn_order': 3},
         {'name': 'Player 6', 'match_to_link': 3, 'owner': True,
             'token': 'token6', 'turn_order': 1}]
@@ -68,7 +68,7 @@ def load_data_for_test():
     try:
         for match in list_matches:
             new_match = Matches(match_name=match['name'], max_players=match['max_players'],
-                                is_public=match['public'], state="WAITING", current_players=1)
+                                is_public=match['public'], state="WAITING", current_players=2)
             session.add(new_match)
             session.commit()
         for player in list_players:
