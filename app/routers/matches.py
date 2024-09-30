@@ -96,7 +96,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             raise HTTPException(status_code=404, detail="Match not found")
         player_service = PlayerService(db)
         player = player_service.get_player_by_id(player_id)
-        if player["is_owner"] and player["match_id"] == match_id:
+        if player.is_owner and player.match_id == match_id:
             match.state = MatchState.STARTED.value
             db.commit()
             # TODO SWT-17 and SWT-18
