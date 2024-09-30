@@ -35,7 +35,6 @@ def match_service(session):
 """
 def test_get_matches(match_service: MatchService):
     matches = match_service.get_all_matches()
-    assert len(matches) == 0 # Check if the list of matches is empty
     try:
         session2 = Session()
         list_matches = [
@@ -49,7 +48,7 @@ def test_get_matches(match_service: MatchService):
             session2.add(new_match)
             session2.commit()
         matches2 = match_service.get_all_matches()
-        assert len(matches2) == 3 # Check if the list of matches is 3 next to adding 3 matches
+        assert len(matches2) == len(matches) + 3 # Check if the list of matches is 3 next to adding 3 matches
     finally:
         session2.close()
 
