@@ -35,7 +35,6 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
     except WebSocketDisconnect:
         manager.disconnect_player_from_game(game_id, player_id)
 
-
 @router.get("/", response_model=list[MatchOut])
 def get_matches(db: Session = Depends(get_db)):
     try:
@@ -45,16 +44,16 @@ def get_matches(db: Session = Depends(get_db)):
     except:
         raise HTTPException(status_code=404, detail="No matches found")
 
-
 @router.get("/{match_id}", response_model=MatchOut)
 def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
+        return match
     except:
         raise HTTPException(status_code=404, detail="Match not found")
 
-@router.post("/")
+@router.post("/", status_code=200)
 def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
