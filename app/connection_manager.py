@@ -34,7 +34,7 @@ class ConnectionManager:
             player_id: id of the player who wants to join.
             websocket: websocket connection to save.
         """
-
+        print(self._games)
         if game_id not in self._games:
             raise GameConnectionDoesNotExist(game_id)
 
@@ -92,3 +92,6 @@ class ConnectionManager:
 
         conn: WebSocket = self._games[game_id][player_id]
         await conn.send_json(msg)
+        
+
+manager = ConnectionManager()

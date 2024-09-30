@@ -86,7 +86,7 @@ class MatchService:
         """
         try:
             if available:
-                matches = self.db.query(Matches).filter(Matches.state == MatchState.WAITING.value, Matches.max_players < 4).all()
+                matches = self.db.query(Matches).filter(Matches.state == MatchState.WAITING.value, Matches.current_players < 4).all()
             else:
                 matches = self.db.query(Matches).all()
             return matches
