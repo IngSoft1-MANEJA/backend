@@ -78,7 +78,7 @@ class Players(Base):
     is_owner: Mapped[bool] = mapped_column(Boolean)
     session_token: Mapped[str] = mapped_column(String)
     turn_order: Mapped[int] = mapped_column(Integer, nullable=True)
-    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
+    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship("Matches", back_populates="players", post_update=True)

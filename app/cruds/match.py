@@ -86,7 +86,7 @@ class MatchService:
         """
         try:
             if available:
-                matches = self.db.query(Matches).filter(Matches.state == MatchState.WAITING.value, Matches.current_players < 4).all()
+                matches = self.db.query(Matches).filter(Matches.state == MatchState.WAITING.value, Matches.current_players < Matches.max_players).all()
             else:
                 matches = self.db.query(Matches).all()
             return matches
@@ -109,7 +109,7 @@ class MatchService:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
             match.state = new_state
             match.current_players = new_amount_players
-            self.db.add(match)
+            # self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
         except NoResultFound:

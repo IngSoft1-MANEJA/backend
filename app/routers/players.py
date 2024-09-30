@@ -10,7 +10,7 @@ from app.database import get_db
 router = APIRouter(prefix="/matches")
 
 @router.delete("/{match_id}/left/{player_id}")
-def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
+async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
     try:
         match_service = MatchService(db)
         player_service = PlayerService(db)
@@ -18,7 +18,9 @@ def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
         player_to_delete = player_service.get_player_by_id(player_id)
         match_to_leave = match_service.get_match_by_id(match_id)
         
+        player_name = player_to_delete.player_name
         player_match = player_to_delete.match_id
+        
         if player_match != match_id:
             raise HTTPException(status_code=404, detail="Player not in match")
         
@@ -27,21 +29,24 @@ def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
             if player_to_delete.is_owner:
                 raise HTTPException(status_code=400, detail="Owner cannot leave match")
         else:
-            manager.broadcast_to_game(match_id, {"detail": f"Player {player_id} left the lobby"})
+            await manager.broadcast_to_game(match_id, {"detail": f"Player {player_id} left the lobby"})
                 
-
+        match_to_leave = match_service.get_match_by_id(match_id)
         player_service.delete_player(player_id)
-        manager.disconnect_player_from_game(match_id, player_id)
+        
+        try:
+            manager.disconnect_player_from_game(match_id, player_id)
+        except Exception as e:
+           print("El problema es:", e)
         match_service.update_match(match_id, match_to_leave.state, match_to_leave.current_players - 1)
+           
         
         
-        if match_to_leave.state == "STARTED":
-            manager.broadcast_to_game(match_id, {"detail": f"Player {player_id} left the match"})
-            if match_to_leave.current_players == 1:
-                manager.broadcast_to_game(match_id, {"detail": "Match finished by abandon, you Win!"})
-                match_service.update_match(match_id, "FINISHED", match_to_leave.current_players)
-                
-        return {"detail": "Player leave successfully"}
+        msg = {"key": "PLAYER_LEFT", "payload":{"name": player_name}}
+
+        await manager.broadcast_to_game(match_id, msg)
+        return {"player_id": player_id, "players": player_name}
+
     except PlayerNotConnected as e:
         raise HTTPException(status_code=404, detail="Player not connected to match")
     except GameConnectionDoesNotExist as e:

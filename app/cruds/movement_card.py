@@ -38,7 +38,6 @@ class MovementCardService:
             movement_card = MovementCards(mov_type=mov_type)
         else:
             movement_card = MovementCards(mov_type=mov_type, player_owner=player_owner)
-        print(movement_card)
         self.db.add(movement_card)
         self.db.commit()
         self.db.refresh(movement_card)

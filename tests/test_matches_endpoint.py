@@ -46,7 +46,6 @@ def test_create_match():
     # Verifica que el match y el player se hayan creado en la base de datos
     db = TestingSessionLocal()
     match = db.query(Matches).filter(Matches.id == data["match_id"]).first()
-    print(match)
     assert match is not None
     assert match.match_name == "Test Lobby"
     assert match.max_players == 4

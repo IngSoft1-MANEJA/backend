@@ -34,7 +34,6 @@ class ConnectionManager:
             player_id: id of the player who wants to join.
             websocket: websocket connection to save.
         """
-        print(self._games)
         if game_id not in self._games:
             raise GameConnectionDoesNotExist(game_id)
 
