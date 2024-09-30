@@ -33,11 +33,13 @@ class Matches(Base):
     players: Mapped[List["Players"]] = relationship("Players", back_populates="match",
                                                     cascade="all, delete-orphan",
                                                     foreign_keys="[Players.match_id]",
-                                                    post_update=True)
+                                                    post_update=True,
+                                                    passive_deletes=True)
     board: Mapped["Boards"] = relationship("Boards", back_populates="match",
                                            cascade="all, delete-orphan",
                                            uselist=False,
-                                           post_update=True)
+                                           post_update=True,
+                                           passive_deletes=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('state')
@@ -79,9 +81,17 @@ class Players(Base):
     match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
-    match: Mapped["Matches"] = relationship("Matches", back_populates="players", foreign_keys=[match_id], post_update=True)
-    shape_cards: Mapped[List["ShapeCards"]] = relationship("ShapeCards", back_populates="owner", post_update=True)
-    movement_cards: Mapped[List["MovementCards"]] = relationship("MovementCards", back_populates="owner", post_update=True)
+    match: Mapped["Matches"] = relationship("Matches", back_populates="players", post_update=True)
+    shape_cards: Mapped[List["ShapeCards"]] = relationship("ShapeCards", 
+                                                           back_populates="owner",
+                                                           cascade="all, delete-orphan",
+                                                           post_update=True,
+                                                           passive_deletes=True)
+    movement_cards: Mapped[List["MovementCards"]] = relationship("MovementCards", 
+                                                                 back_populates="owner",
+                                                                 cascade="all, delete-orphan", 
+                                                                 post_update=True,
+                                                                 passive_deletes=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('turn_order')
@@ -121,7 +131,7 @@ class Boards(Base):
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship("Matches", back_populates="board", lazy='joined', post_update=True)
-    tiles: Mapped[List["Tiles"]] = relationship("Tiles", back_populates="board", post_update=True)
+    tiles: Mapped[List["Tiles"]] = relationship("Tiles", back_populates="board", post_update=True, passive_deletes=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('ban_color')

@@ -82,11 +82,7 @@ def test_get_player_by_id(player_service: PlayerService, session):
     # obtengo el player usando el servicio
     player2 = player_service.get_player_by_id(player_id)
     # Verifico que los valores del diccionario devuelto son los esperados
-    assert player2['id'] == player_id
-    assert player2['player_name'] == player.player_name
-    assert player2['is_owner'] == player.is_owner
-    assert player2['session_token'] == player.session_token
-    assert player2['turn_order'] == player.turn_order
+    assert player == player2
 
 def test_update_player(player_service: PlayerService, session):
     player = player_service.create_player('Test-Player-Update', 1, True, 'tokenid341')
@@ -97,10 +93,12 @@ def test_update_player(player_service: PlayerService, session):
     player_service.update_turn_order(player_id, 4)
     # chequeo que el player se haya actualizado
     player_get = player_service.get_player_by_id(player_id)
-    assert player_get['match_id'] == 2
-    assert player_get['turn_order'] == 4
+    assert player_get.match_id == 2
+    assert player_get.turn_order == 4
 
 def test_delete_player(player_service: PlayerService, session):
+    match = MatchService(session)
+    match.create_match('Test-Match-Delete', 3, True)
     player = player_service.create_player('Test-Player-Delete', 1, True, 'tokenidelete1')
     number_players = session.query(Players).count()
     player_id = player_service.get_player_id(player)

@@ -78,14 +78,7 @@ class PlayerService:
             player = self.db.query(Players).filter(Players.id == player_id).first()
             if player is None:
                 raise NoResultFound
-            return {
-                'id': player.id,
-                'player_name': player.player_name,
-                'match_id': player.match_id,
-                'is_owner': player.is_owner,
-                'session_token': player.session_token,
-                'turn_order': player.turn_order
-            }
+            return player
         except NoResultFound:
             raise ValueError("No player with that id")
 
@@ -100,6 +93,7 @@ class PlayerService:
                 none.
         """
         try:
+            
             player = self.db.query(Players).filter(Players.id == player_id).first()
             if player is None:
                 raise NoResultFound

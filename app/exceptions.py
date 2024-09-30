@@ -70,6 +70,11 @@ class PlayerNameInvalid(SwitcherException):
         message: str = f"Player name {name} is invalid"
         super().__init__(message)
         
+class PlayerNotInMatch(SwitcherException):
+    def __init__(self, player_id: int, match_id: int):
+        message: str = f"Player {player_id} not in match with id: {match_id}"
+        super().__init__(message)
+        
 class PlayerNotCreated(SwitcherException):
     def __init__(self, name: str):
         message: str = f"Player {name} not created, error creating player"
