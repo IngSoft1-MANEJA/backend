@@ -59,8 +59,8 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
     
-    match1 = match_service.create_match(match.lobby_name, match.max_players, match.is_public)
     new_player = player_service.create_player(match.player_name, match1.id, True , match.token)
+    match1 = match_service.create_match(match.lobby_name, match.max_players, match.is_public)
     manager.create_game_connection(match1.id)
     
     return {"player_id": new_player.id, "match_id": match1.id}

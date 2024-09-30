@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from app.config import DATABASE_FILENAME
 
 # Configuración de la base de datos
-engine = create_engine(f'sqlite:///{DATABASE_FILENAME}', echo=True)
+engine = create_engine(f'sqlite:///{DATABASE_FILENAME}')
 Base = declarative_base()
 
 # Crea una sesión
