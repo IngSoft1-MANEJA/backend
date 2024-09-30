@@ -14,6 +14,16 @@ sudo apt-get install python3-pip
 ```bash
 sudo apt-get install python3-venv
 ```
+4. Install SQLite3 by running the following command:
+```bash
+sudo apt-get install sqlite3
+```
+5. Check that you have installed all the dependencies by running the following commands:
+```bash
+python3 --version
+pip3 --version
+sqlite3 --version
+```
 Once you have installed all the dependencies, you can continue with the next steps to run the project.
 --- 
 #### Creating a virtual environment
@@ -71,4 +81,31 @@ Once you have installed all the dependencies, you can continue with the next ste
 
 ---
 ## Running the project
-To run the project in your local machine, follow the following steps:
+To run the project in your local machine, follow the following step:
+```bash
+cd app
+```
+
+To start te server run:
+```bash
+PYTHONPATH=.. uvicorn main:app
+```
+or
+```bash
+fastapi run
+```
+
+To run the tests:
+1. Change directory to root directory and run
+```bash
+pytest tests/
+```
+If you want to run only especifics tests, you can run:
+```bash
+pytest -m tests/test_you_want.py
+```
+
+You also can execute the test for cruds operation using a makefile:
+```bash
+make run-tests_crud
+```
