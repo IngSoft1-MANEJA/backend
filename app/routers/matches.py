@@ -1,7 +1,10 @@
+from random import shuffle
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, Depends, HTTPException
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 
+from app.cruds.board import BoardService
+from app.cruds.tile import TileService
 from app.exceptions import *
 from app.connection_manager import ConnectionManager, manager
 from app.cruds.match import MatchService
@@ -74,12 +77,12 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
         if match.current_players >= match.max_players:
             raise HTTPException(status_code=404, detail="Match is full")
         player_service = PlayerService(db)
-        
+
         player = player_service.create_player(playerJoinIn.player_name, match_id, False, "123")
         match.current_players = match.current_players + 1
         players = [player.player_name for player in match.players]
         db.commit()
-        
+
         msg = {"key": "PLAYER_JOIN", "payload":{"name": player.player_name}}
 
         await manager.broadcast_to_game(match_id, msg)
@@ -87,24 +90,46 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
     except:
         raise HTTPException(status_code=404, detail="Match not found")
 
+
 @router.patch("/{match_id}/start/{player_id}", status_code=200)
 async def start_match(match_id: int, player_id: int, db: Session = Depends(get_db)):
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
-        if match.current_players < 2 or match.state != MatchState.WAITING.value: 
+
+        if match.current_players < 2 or match.state != MatchState.WAITING.value:
             raise HTTPException(status_code=404, detail="Match not found")
+
         player_service = PlayerService(db)
         player = player_service.get_player_by_id(player_id)
+
         if player.is_owner and player.match_id == match_id:
+
             match.state = MatchState.STARTED.value
-            db.commit()
-            # TODO SWT-17 and SWT-18
-            msg = {
-                "key" : "START_MATCH",
-                "payload" : {}
-            }
-            await manager.broadcast_to_game(match_id, msg)
+            # TODO SWT-18
+
+            players_order = MatchService.set_players_order(match)
+
+            board_service = BoardService(db)
+            board = board_service.create_board(match_id)
+            BoardService.init_board(board.id, match_id)
+
+            board_table = board.board_table
+            player_turn = players_order[0].player_name
+
+            for player in players_order:
+                # Placeholder for movement cards and shape cards
+
+                msg = {
+                    "key": "START_MATCH",
+                    "payload": {
+                        "player_turn": player_turn,
+                        "board": board_table,
+                        "movement_cards": [],
+                        "players_shape_cards": [],
+                    },
+                }
+                await manager.send_to_player(match_id, player.id, msg)
             return None
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
