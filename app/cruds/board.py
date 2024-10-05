@@ -1,5 +1,7 @@
-from sqlalchemy.exc import NoResultFound
+from random import shuffle
 from typing import List
+from app.cruds.tile import TileService
+from app.models.enums import Colors
 from app.models.models import Boards
 from app.utils.utils import validate_color, validate_turn, validate_board
 
@@ -19,11 +21,12 @@ class BoardService:
             db: La session de la base de datos."""
         self.db = db
 
-    def create_board(self, match_id : int, ban_color : str = None, current_player : int = None, next_player_turn : int = None):
+    def create_board(self, match_id : int, ban_color : str = None):
         """
         Crea un nuevo tablero en la base de datos.
         Args:
             match_id: Id de la partida a la cual pertenece el tablero.
+            ban_color: Color del ban.
         Returns:
             new_board: Tablero creado.
         """
@@ -31,17 +34,30 @@ class BoardService:
         if ban_color:
             validate_color(ban_color)
             new_board.ban_color = ban_color
-        if current_player:
-            validate_turn(current_player, next_player_turn, new_board.id)
-            new_board.current_player = current_player
-        if next_player_turn:
-            validate_turn(current_player, next_player_turn, new_board.id)
-            new_board.next_player_turn = next_player_turn
-    
+
         self.db.add(new_board)
         self.db.commit()
         return new_board
-    
+
+    def init_board(self, board_id: int, match_id: int):
+        """Initializes the board with the tiles.
+
+        Args:
+            board_id (int): Id of the board in the db.
+            match_id (int): Id of the match the board belongs to.
+        """
+
+        table = [color for color in Colors] * 9
+        shuffle(table)
+
+        tile_service = TileService(self.db)
+        for i in range(6):
+            for j in range(6):
+                color = table.pop()
+                tile_service.create_tile(board_id, color, i, j, match_id)
+
+        self.db.commit()
+
     def get_all_boards(self) -> List[Boards]:
         """
         Obtiene todos los tableros de la base de datos.
@@ -71,11 +87,11 @@ class BoardService:
             ban_color: Color del ban.
         """
         validate_color(ban_color)
-        
+
         board = self.db.query(Boards).filter(Boards.id == board_id).one()
         board.ban_color = ban_color
         self.db.commit()
-    
+
     def delete_board(self, board_id : int):
         """
         Elimina un tablero de la base de datos.
@@ -86,7 +102,7 @@ class BoardService:
         validate_board(board.id)
         self.db.delete(board)
         self.db.commit()
-        
+
     def update_turn(self, board_id : int, current_player : int, next_player_turn : int):
         """
         Actualiza el turno de los jugadores.
