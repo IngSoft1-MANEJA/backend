@@ -1,8 +1,9 @@
+from itertools import cycle
 from random import shuffle
 from typing import List
 from app.cruds.tile import TileService
 from app.models.enums import Colors
-from app.models.models import Boards
+from app.models.models import Boards, Tiles
 from app.utils.utils import validate_color, validate_turn, validate_board
 
 class BoardService:
@@ -39,24 +40,46 @@ class BoardService:
         self.db.commit()
         return new_board
 
-    def init_board(self, board_id: int, match_id: int):
+    def init_board(self, board_id: int):
         """Initializes the board with the tiles.
 
         Args:
             board_id (int): Id of the board in the db.
-            match_id (int): Id of the match the board belongs to.
         """
 
-        table = [color for color in Colors] * 9
+        table = [color.value for color in Colors] * 9
         shuffle(table)
 
         tile_service = TileService(self.db)
+        table_iter = iter(table)
         for i in range(6):
             for j in range(6):
-                color = table.pop()
-                tile_service.create_tile(board_id, color, i, j, match_id)
+                color = next(table_iter)
+                tile_service.create_tile(board_id, color, i, j)
 
         self.db.commit()
+
+    def get_board_table(self, board_id: int) -> List[List[str]]:
+        """Obtiene la representacion del tablero en una matriz de colores.
+
+        Args:
+            board_id (int): id de la tabla a obtener.
+
+        Returns:
+            List[List[str]]: matriz de colores del tablero.
+        """
+
+        tiles = (
+            self.db.query(Tiles)
+            .filter(Boards.id == board_id)
+            .order_by(Tiles.position_x, Tiles.position_y)
+            .all()
+        )
+        board = [
+            [tile.color for tile in tiles[i * 6 : (i + 1) * 6]]
+            for i in range(6)
+        ]
+        return board
 
     def get_all_boards(self) -> List[Boards]:
         """

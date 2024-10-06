@@ -28,7 +28,7 @@ class Matches(Base):
     is_public: Mapped[bool] = mapped_column(Boolean)
     current_players: Mapped[int] = mapped_column(Integer)
     max_players: Mapped[int] = mapped_column(Integer)
-    current_player_turn: Mapped[int] = mapped_column(Integer, default=0, max=4)
+    current_player_turn: Mapped[int] = mapped_column(Integer, default=0)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     players: Mapped[List["Players"]] = relationship("Players", back_populates="match",
@@ -139,16 +139,6 @@ class Boards(Base):
             raise ValueError(f"Color {color} is not a valid color to ban, must be one of {Colors._value2member_map_.keys()}")
         return color
     
-    @property
-    def board_table(self):
-        tiles = self.tiles.order_by(Tiles.position_y, Tiles.position_x).all()
-        board = []
-        start = 0
-        for _ in range(6):
-            end = start + 6
-            board.append([tile.color for tile in tiles[start:end]])
-            start = end - 1
-        return board
 
     # --------------------------------- REPR -------------------------------#
     def __repr__(self):
