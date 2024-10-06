@@ -50,6 +50,8 @@ class MatchService:
     
     def set_players_order(self, match: Matches) -> List[Players]:
         """Setea el orden de los jugadores en el match de manera random.
+
+        Setea el current_player_turn a 1.
         
         Returns:
             List[Players]: Lista de jugadores con el orden seteado.
@@ -59,6 +61,8 @@ class MatchService:
 
         for i, player in enumerate(players, start=1):
             player.turn_order = i
+        
+        match.current_player_turn = 1
 
         self.db.commit()
 
