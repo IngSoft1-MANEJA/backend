@@ -6,7 +6,7 @@ from app.models.models import Base
 
 
 @pytest.fixture()
-def memory_db():
+def db():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
 

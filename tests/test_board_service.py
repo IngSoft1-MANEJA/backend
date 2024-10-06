@@ -42,11 +42,11 @@ def test_init_board(mock_create_tile: mock.Mock):
     db.commit.assert_called_once()
 
 
-def test_board_table_property(memory_db):
+def test_board_table_property(db):
 
     board = Boards(match_id=1)
-    memory_db.add(board)
-    memory_db.commit()
+    db.add(board)
+    db.commit()
 
     colors = [color.value for color in Colors]
 
@@ -57,13 +57,13 @@ def test_board_table_property(memory_db):
             tile = Tiles(
                 board_id=board.id, color=next(colors_iter), position_x=i, position_y=j
             )
-            memory_db.add(tile)
+            db.add(tile)
 
-    memory_db.commit()
+    db.commit()
 
     expected_table = [[next(colors_iter) for _ in range(6)] for _ in range(6)]
 
-    board_service = BoardService(memory_db)
+    board_service = BoardService(db)
     board_table = board_service.get_board_table(board.id)
     
     assert board_table == expected_table
