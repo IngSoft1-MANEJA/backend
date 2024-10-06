@@ -108,11 +108,11 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             match.state = MatchState.STARTED.value
             # TODO SWT-18
 
-            players_order = MatchService.set_players_order(match)
+            players_order = match_service.set_players_order(match)
 
             board_service = BoardService(db)
             board = board_service.create_board(match_id)
-            BoardService.init_board(board.id, match_id)
+            board_service.init_board(board.id)
 
             board_table = board_service.get_board_table(board.id)
             player_turn = players_order[0].player_name
