@@ -71,7 +71,7 @@ class BoardService:
 
         tiles = (
             self.db.query(Tiles)
-            .filter(Boards.id == board_id)
+            .filter(Tiles.board_id == board_id)
             .order_by(Tiles.position_x, Tiles.position_y)
             .all()
         )
