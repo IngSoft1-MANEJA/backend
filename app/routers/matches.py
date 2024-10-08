@@ -1,12 +1,10 @@
-from random import shuffle
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, Depends, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from app.cruds.board import BoardService
-from app.cruds.tile import TileService
 from app.exceptions import *
-from app.connection_manager import ConnectionManager, manager
+from app.connection_manager import manager
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.models.enums import *
@@ -118,7 +116,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             player_turn = players_order[0].player_name
 
             for player in players_order:
-                # Placeholder for movement cards and shape cards
+                # TODO: SWT-18 y SWT-19
 
                 msg = {
                     "key": "START_MATCH",
