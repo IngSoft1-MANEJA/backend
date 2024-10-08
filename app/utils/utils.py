@@ -17,7 +17,6 @@ VALID_COLORS = Colors._value2member_map_.keys()
 VALID_SHAPES = Shapes._value2member_map_.keys()
 VALID_MOVEMENTS = Movements._value2member_map_.keys()
 
-
 def validate_match_name(name: str):
     if any(char in INVALID_CHARACTERS for char in name):
         raise e.MatchNameInvalid(name)

@@ -40,3 +40,6 @@ class MatchState(enum.Enum):
     STARTED = "STARTED"
     FINISHED = "FINISHED"
     
+class ReasonWinning(enum.Enum):
+    NORMAL = "NORMAL"
+    FORFEIT = "FORFEIT"
