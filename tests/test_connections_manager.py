@@ -1,33 +1,10 @@
-import pytest
 from fastapi.testclient import TestClient
-from fastapi import FastAPI, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import WebSocket
 
 from app.exceptions import *
-from app.connection_manager import ConnectionManager
 from app.routers.matches import manager as manager2
-from app.routers import matches
+from tests.config import *
 
-@pytest.fixture
-def app():
-    app = FastAPI()
-
-    origins = ["*"]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-    app.include_router(matches.router)
-
-    return app
-
-@pytest.fixture
-def manager():
-    return ConnectionManager()
 
 def test_connect_player_to_game_success(app, manager):
     @app.websocket("/wsTestRoute")
@@ -158,6 +135,7 @@ def test_broadcast_to_game_raise_exceptions(app, manager):
 
     with client.websocket_connect("/wsTestRoute"):
         pass
+
 
 def test_create_websocket_connection(app, manager):
     @app.websocket("/wsTestRoute")

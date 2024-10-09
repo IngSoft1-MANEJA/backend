@@ -1,12 +1,13 @@
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
-from typing import Any, Dict 
+from typing import Any, Dict
 
 from app.exceptions import *
+
 
 class ConnectionManager:
     def __init__(self) -> None:
         self._games: Dict[int, Dict[int, WebSocket]] = {}
-    
+
     def create_game_connection(self, game_id):
         """Creates a new game entry for future connections.
 
@@ -91,6 +92,6 @@ class ConnectionManager:
 
         conn: WebSocket = self._games[game_id][player_id]
         await conn.send_json(msg)
-        
+
 
 manager = ConnectionManager()

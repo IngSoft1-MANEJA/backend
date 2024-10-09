@@ -6,6 +6,7 @@ from sqlalchemy import Column, String, Integer, Boolean, ForeignKey
 
 # ================================================ MATCHES MODELS =================================#
 
+
 class Matches(Base):
     """
         Model of the Matches table in the database.
@@ -48,12 +49,14 @@ class Matches(Base):
             raise ValueError(f"State {state} is not a valid state")
         return state
     # --------------------------------- REPR --------------------------------#
+
     def __repr__(self):
         return (f"Match(id={self.id!r}, match_name={self.match_name!r}, "
                 f"state={self.state!r}, is_public={self.is_public!r}, "
                 f"max_players={self.max_players!r})")
 
 # ================================================ PLAYERS MODELS =================================#
+
 
 class Players(Base):
     """
@@ -78,18 +81,20 @@ class Players(Base):
     is_owner: Mapped[bool] = mapped_column(Boolean)
     session_token: Mapped[str] = mapped_column(String)
     turn_order: Mapped[int] = mapped_column(Integer, nullable=True)
-    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'), nullable=True)
+    match_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey('matches.id'), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
-    match: Mapped["Matches"] = relationship("Matches", back_populates="players", post_update=True)
-    shape_cards: Mapped[List["ShapeCards"]] = relationship("ShapeCards", 
+    match: Mapped["Matches"] = relationship(
+        "Matches", back_populates="players", post_update=True)
+    shape_cards: Mapped[List["ShapeCards"]] = relationship("ShapeCards",
                                                            back_populates="owner",
                                                            cascade="all, delete-orphan",
                                                            post_update=True,
                                                            passive_deletes=True)
-    movement_cards: Mapped[List["MovementCards"]] = relationship("MovementCards", 
+    movement_cards: Mapped[List["MovementCards"]] = relationship("MovementCards",
                                                                  back_populates="owner",
-                                                                 cascade="all, delete-orphan", 
+                                                                 cascade="all, delete-orphan",
                                                                  post_update=True,
                                                                  passive_deletes=True)
 
@@ -97,7 +102,8 @@ class Players(Base):
     @validates('turn_order')
     def validate_turn_order(self, key, turn_order):
         if turn_order < 1 or turn_order > 4:
-            raise ValueError(f"Turn order {turn_order} is not valid: must be between 1 and 4")
+            raise ValueError(
+                f"Turn order {turn_order} is not valid: must be between 1 and 4")
         return turn_order
 
     # --------------------------------- REPR -------------------------------#
@@ -106,6 +112,7 @@ class Players(Base):
                 f"is_owner={self.is_owner!r}, match_id={self.match_id!r})")
 
 # ================================================ BOARDS MODELS =================================#
+
 
 class Boards(Base):
     """
@@ -126,18 +133,23 @@ class Boards(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     ban_color: Mapped[str] = mapped_column(String(50), nullable=True)
     match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
-    current_player_turn: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable=True)
-    next_player_turn: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable=True)
+    current_player_turn: Mapped[int] = mapped_column(
+        Integer, ForeignKey('players.id'), nullable=True)
+    next_player_turn: Mapped[int] = mapped_column(
+        Integer, ForeignKey('players.id'), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
-    match: Mapped["Matches"] = relationship("Matches", back_populates="board", lazy='joined', post_update=True)
-    tiles: Mapped[List["Tiles"]] = relationship("Tiles", back_populates="board", post_update=True, passive_deletes=True)
+    match: Mapped["Matches"] = relationship(
+        "Matches", back_populates="board", lazy='joined', post_update=True)
+    tiles: Mapped[List["Tiles"]] = relationship(
+        "Tiles", back_populates="board", post_update=True, passive_deletes=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('ban_color')
     def validate_ban_color(self, key, color):
         if color not in Colors._value2member_map_.keys():
-            raise ValueError(f"Color {color} is not a valid color to ban, must be one of {Colors._value2member_map_.keys()}")
+            raise ValueError(
+                f"Color {color} is not a valid color to ban, must be one of {Colors._value2member_map_.keys()}")
         return color
 
     # --------------------------------- REPR -------------------------------#
@@ -145,6 +157,7 @@ class Boards(Base):
         return (f"Board(id={self.id!r}, match_id={self.match_id!r})")
 
 # ================================================ TILES MODELS ===================================#
+
 
 class Tiles(Base):
     """
@@ -176,7 +189,7 @@ class Tiles(Base):
         if position < 0 or position > 5:
             raise ValueError(f"Position {position} is out of bounds")
         return position
-    
+
     @validates('color')
     def validate_color(self, key, color):
         if color not in Colors._value2member_map_:
@@ -190,6 +203,7 @@ class Tiles(Base):
                 f"board_id={self.board_id!r})")
 
 # ================================================ SHAPECARDS MODELS ==============================#
+
 
 class ShapeCards(Base):
     """
@@ -208,14 +222,16 @@ class ShapeCards(Base):
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    shape_type: Mapped[int] # mapeamos int para identificar las cartas
+    shape_type: Mapped[int]  # mapeamos int para identificar las cartas
     is_hard: Mapped[bool]
     is_visible: Mapped[bool]
     is_blocked: Mapped[bool]
-    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'))
+    player_owner: Mapped[int] = mapped_column(
+        Integer, ForeignKey('players.id'))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
-    owner: Mapped["Players"] = relationship("Players", back_populates="shape_cards", post_update=True)
+    owner: Mapped["Players"] = relationship(
+        "Players", back_populates="shape_cards", post_update=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('shape_type')
@@ -232,6 +248,7 @@ class ShapeCards(Base):
 
 # ================================================ MOVEMENTCARDS MODELS ===========================#
 
+
 class MovementCards(Base):
     """
         Model of the MovementCards table in the database.
@@ -247,10 +264,12 @@ class MovementCards(Base):
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     mov_type: Mapped[str]
-    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable = True)
+    player_owner: Mapped[int] = mapped_column(
+        Integer, ForeignKey('players.id'), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
-    owner: Mapped["Players"] = relationship("Players", back_populates="movement_cards", post_update=True)
+    owner: Mapped["Players"] = relationship(
+        "Players", back_populates="movement_cards", post_update=True)
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('mov_type')
