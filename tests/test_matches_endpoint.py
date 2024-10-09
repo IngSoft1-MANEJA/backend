@@ -11,7 +11,7 @@ from app.cruds.player import PlayerService
 from app.main import app
 from app.database import Base, get_db, init_db, delete_db, engine
 from app.models import Matches, Players
-from app.models.models import Boards
+from app.models.models import Boards, Tiles
 from app.routers.matches import manager
 from tests.populate_test_db import load_data_for_test
 
@@ -125,25 +125,55 @@ def test_join_match_success():
         data = websocket.receive_json()
         assert data == {"key": "PLAYER_JOIN", "payload":{"name": player_name}}
 
+
 class TestStartMatchEndpoint:
 
-    def test_start_match(self):
+    @pytest.fixture(scope="class")
+    def db(self):
         db = TestingSessionLocal()
-        seed(49)
-        match_service = MatchService(db)
+        return db
+
+    @pytest.fixture(scope="class")
+    def match_service(self, db):
+        return MatchService(db)
+
+    @pytest.fixture(scope="class")
+    def player_service(self, db):
+        return PlayerService(db)
+
+    @pytest.fixture(scope="class")
+    def match(self, match_service):
         match = match_service.create_match("Test match", 4, True)
+        return match
 
-        player_service = PlayerService(db)
-
+    @pytest.fixture(scope="class")
+    def owner(self, player_service, match):
         owner = player_service.create_player("test_owner", match.id, True, "testtoken")
+        return owner
 
+    @pytest.fixture(scope="class")
+    def players(self, player_service, match):
         players = []
         for i in range(1, 3):
             player = player_service.create_player(
                 f"test_player_{i}", match.id, False, "testtoken"
             )
-
             players.append(player)
+        return players
+
+    @pytest.fixture(scope="class")
+    def cleanup(self, match, db):
+        yield
+
+        db.query(Players).filter(Players.match_id == match.id).delete()
+        board = db.query(Boards).filter(Boards.match_id == match.id).first()
+        db.query(Tiles).filter(Tiles.board_id == board.id).delete()
+        db.query(Boards).filter(Boards.match_id == match.id).delete()
+        db.query(Matches).filter(Matches.id == match.id).delete()
+        db.commit()
+
+    def test_start_match(self, match, owner, players, db):
+        seed(49)
 
         match.current_players += 3
         db.commit()
@@ -176,8 +206,14 @@ class TestStartMatchEndpoint:
             assert payload["turn_order"] == owner.turn_order
             assert payload["board"] == board_table
             assert payload["opponents"] == [
-                {"player_name": players[1].player_name, "turn_order": players[1].turn_order},
-                {"player_name": players[0].player_name, "turn_order": players[0].turn_order},
+                {
+                    "player_name": players[1].player_name,
+                    "turn_order": players[1].turn_order,
+                },
+                {
+                    "player_name": players[0].player_name,
+                    "turn_order": players[0].turn_order,
+                },
             ]
 
             data = websocket2.receive_json()
@@ -188,7 +224,10 @@ class TestStartMatchEndpoint:
             assert payload["turn_order"] == players[0].turn_order
             assert payload["board"] == board_table
             assert payload["opponents"] == [
-                {"player_name": players[1].player_name, "turn_order": players[1].turn_order},
+                {
+                    "player_name": players[1].player_name,
+                    "turn_order": players[1].turn_order,
+                },
                 {"player_name": owner.player_name, "turn_order": owner.turn_order},
             ]
 
@@ -200,6 +239,9 @@ class TestStartMatchEndpoint:
             assert payload["turn_order"] == players[1].turn_order
             assert payload["board"] == board_table
             assert payload["opponents"] == [
-                {"player_name": players[0].player_name, "turn_order": players[0].turn_order},
+                {
+                    "player_name": players[0].player_name,
+                    "turn_order": players[0].turn_order,
+                },
                 {"player_name": owner.player_name, "turn_order": owner.turn_order},
             ]
