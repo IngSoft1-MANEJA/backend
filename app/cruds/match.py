@@ -1,3 +1,4 @@
+from copy import copy
 from random import shuffle
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
@@ -24,7 +25,6 @@ class MatchService:
             db: La session de la base de datos."""        
         self.db = db
 
-
     def create_match(self, name: str, max_players: int, public: bool):
         """
             Crea un nuevo match en la database.
@@ -47,7 +47,7 @@ class MatchService:
             return match
         except Exception as e:
             raise e
-    
+
     def set_players_order(self, match: Matches) -> List[Players]:
         """Setea el orden de los jugadores en el match de manera random.
 
@@ -56,18 +56,18 @@ class MatchService:
         Returns:
             List[Players]: Lista de jugadores con el orden seteado.
         """
-        players = match.players
+        players = self.db.query(Players).filter(Players.match_id == match.id).all()
         shuffle(players)
 
         for i, player in enumerate(players, start=1):
             player.turn_order = i
-        
+
         match.current_player_turn = 1
 
         self.db.commit()
 
         return players
-    
+
     def get_match_by_id(self, match_id: int):        
         """
             Obtiene un match segun el id dado.
@@ -77,13 +77,13 @@ class MatchService:
             Returns:
                 Atributos del match en formato de diccionario.
         """
-    
+
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
             return match
         except NoResultFound:
             raise NoResultFound(f"Match with id {match_id} not found, can't get")
-        
+
     def get_match_id(self, match: Matches):
         """
             Obtiene el id de un match.
@@ -94,7 +94,7 @@ class MatchService:
                 int: id del match.
         """
         return match.id       
-            
+
     def get_all_matches(self, available: bool = False):
         """
             Obtiene la lista de todos los matches, si se quiere obtener solo los disponibles
@@ -113,8 +113,7 @@ class MatchService:
             return matches
         except NoResultFound:
             raise NoResultFound("No matches found")
-    
-    
+
     def update_match(self, match_id: int, new_state: str, new_amount_players: int):
         """
             Actualiza los atributos de un match en la database.
@@ -135,8 +134,8 @@ class MatchService:
             self.db.refresh(match)
         except NoResultFound:
             raise NoResultFound(f"Match with id {match_id} not found, can't update")
-        
-# El cliente no desea eliminar matches, pero lo dejamos ya hecho
+
+    # El cliente no desea eliminar matches, pero lo dejamos ya hecho
     def delete_match(self, match_id: int):
         """
             Elimina un match de la database.
