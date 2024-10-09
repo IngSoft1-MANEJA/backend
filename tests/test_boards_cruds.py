@@ -71,7 +71,7 @@ def test_update_ban_color_nonexistent_board(board_service, session):
         
 def test_update_turn_valid(board_service, session):
     # Crear un tablero
-    board = board_service.create_board(match_id = 1, current_player = 1, next_player_turn = 2)
+    board = board_service.create_board(match_id = 1)
     # Actualizar el turno del tablero
     board_service.update_turn(board_id=board.id, current_player= 2, next_player_turn= 3)
     # Verificar que el turno se haya actualizado correctamente

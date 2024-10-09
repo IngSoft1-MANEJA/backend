@@ -77,8 +77,7 @@ def load_data_for_test():
             session.add(new_player)
             session.commit()
         for board in list_boards:
-            new_board = Boards(match_id=board['match_id'], ban_color=board['ban_color'],
-                                current_player_turn=board['curren_player_turn'], next_player_turn=board['next_player_turn'])
+            new_board = Boards(match_id=board['match_id'], ban_color=board['ban_color'])
             session.add(new_board)
             session.commit()
         for tile in list_tiles:
