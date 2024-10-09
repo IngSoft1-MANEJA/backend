@@ -12,6 +12,7 @@ from app.models.enums import ReasonWinning
 
 router = APIRouter(prefix="/matches")
 
+
 async def playerWinner(match_id:int, reason: ReasonWinning, db):
     match_service = MatchService(db)
     player_service = PlayerService(db) 
@@ -29,16 +30,16 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
     try:
         match_service = MatchService(db)
         player_service = PlayerService(db)
-        
+
         player_to_delete = player_service.get_player_by_id(player_id)
         match_to_leave = match_service.get_match_by_id(match_id)
-        
+
         player_name = player_to_delete.player_name
         player_match = player_to_delete.match_id
-        
+
         if player_match != match_id:
             raise HTTPException(status_code=404, detail="Player not in match")
-        
+
         # IN LOBBY
         if match_to_leave.state == "WAITING":
             if player_to_delete.is_owner:
@@ -46,7 +47,7 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
                 
         match_to_leave = match_service.get_match_by_id(match_id)
         player_service.delete_player(player_id)
-        
+
         try:
             manager.disconnect_player_from_game(match_id, player_id)
         except Exception as e:
@@ -63,7 +64,8 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         return {"player_id": player_id, "players": player_name}
 
     except PlayerNotConnected as e:
-        raise HTTPException(status_code=404, detail="Player not connected to match")
+        raise HTTPException(
+            status_code=404, detail="Player not connected to match")
     except GameConnectionDoesNotExist as e:
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:

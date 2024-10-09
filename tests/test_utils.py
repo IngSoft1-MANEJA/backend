@@ -1,7 +1,6 @@
 import pytest
 from app.utils.utils import validate_color, validate_turn
 from app.exceptions import ColorNotValid, TurnsAreEqual
-from app.models.enums import Colors
 
 def test_validate_color_valid():
     # Prueba con un color válido
