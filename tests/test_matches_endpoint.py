@@ -1,3 +1,4 @@
+from random import seed
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -128,6 +129,7 @@ class TestStartMatchEndpoint:
 
     def test_start_match(self):
         db = TestingSessionLocal()
+        seed(49)
         match_service = MatchService(db)
         match = match_service.create_match("Test match", 4, True)
 
@@ -158,22 +160,46 @@ class TestStartMatchEndpoint:
             response = client.patch(f"/matches/{match.id}/start/{owner.id}")
             assert response.status_code == status.HTTP_200_OK
 
-            current_player = (
-                db.query(Players)
-                .filter(Players.match_id == match.id, Players.turn_order == 1)
-                .first()
-            )
             board_service = BoardService(db)
             board = db.query(Boards).filter(Boards.match_id == match.id).first()
             board_table = board_service.get_board_table(board.id)
 
-            for websocket in [websocket1, websocket2, websocket3]:
+            db.refresh(owner)
+            db.refresh(players[0])
+            db.refresh(players[1])
 
-                data = websocket.receive_json()
-                assert data["key"] == "START_MATCH"
-                payload = data["payload"]
+            data = websocket1.receive_json()
+            assert data["key"] == "START_MATCH"
+            payload = data["payload"]
 
-                assert payload["player_turn"] == current_player.player_name
-                assert payload["board"] == board_table
-                assert payload["movement_cards"] == []
-                assert payload["players_shape_cards"] == []
+            assert payload["player_name"] == owner.player_name
+            assert payload["turn_order"] == owner.turn_order
+            assert payload["board"] == board_table
+            assert payload["opponents"] == [
+                {"player_name": players[1].player_name, "turn_order": players[1].turn_order},
+                {"player_name": players[0].player_name, "turn_order": players[0].turn_order},
+            ]
+
+            data = websocket2.receive_json()
+            assert data["key"] == "START_MATCH"
+            payload = data["payload"]
+
+            assert payload["player_name"] == players[0].player_name
+            assert payload["turn_order"] == players[0].turn_order
+            assert payload["board"] == board_table
+            assert payload["opponents"] == [
+                {"player_name": players[1].player_name, "turn_order": players[1].turn_order},
+                {"player_name": owner.player_name, "turn_order": owner.turn_order},
+            ]
+
+            data = websocket3.receive_json()
+            assert data["key"] == "START_MATCH"
+            payload = data["payload"]
+
+            assert payload["player_name"] == players[1].player_name
+            assert payload["turn_order"] == players[1].turn_order
+            assert payload["board"] == board_table
+            assert payload["opponents"] == [
+                {"player_name": players[0].player_name, "turn_order": players[0].turn_order},
+                {"player_name": owner.player_name, "turn_order": owner.turn_order},
+            ]

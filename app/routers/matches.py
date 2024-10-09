@@ -113,21 +113,27 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             board_service.init_board(board.id)
 
             board_table = board_service.get_board_table(board.id)
-            player_turn = players_order[0].player_name
 
-            for player in players_order:
+            for player_i in players_order:
                 # TODO: SWT-18 y SWT-19
 
                 msg = {
                     "key": "START_MATCH",
                     "payload": {
-                        "player_turn": player_turn,
+                        "player_name": player_i.player_name,
+                        "turn_order": player_i.turn_order,
                         "board": board_table,
-                        "movement_cards": [],
-                        "players_shape_cards": [],
+                        "opponents": [
+                            {
+                                "player_name": opponent.player_name,
+                                "turn_order": opponent.turn_order,
+                            }
+                            for opponent in players_order
+                            if opponent.id != player_i.id
+                        ],
                     },
                 }
-                await manager.send_to_player(match_id, player.id, msg)
+                await manager.send_to_player(match_id, player_i.id, msg)
             return None
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
