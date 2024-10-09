@@ -33,8 +33,7 @@ def db_session():
         yield db
     finally:
         db.close()
-
-    basedir = os.path.abspath(os.path.dirname(__file__))
+    Base.metadata.drop_all(bind=engine)
     os.remove(basedir + "/test_db.sqlite")
 
 @pytest.fixture

@@ -1,11 +1,12 @@
-from app.database import Base
 from typing import List
 from .enums import Colors, Shapes, Movements, MatchState
-from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
-from sqlalchemy import Column, String, Integer, Boolean, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates, DeclarativeBase
+from sqlalchemy import String, Integer, Boolean, ForeignKey
 
 # ================================================ MATCHES MODELS =================================#
 
+class Base(DeclarativeBase):
+    pass
 
 class Matches(Base):
     """
