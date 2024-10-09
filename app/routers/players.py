@@ -21,7 +21,7 @@ async def playerWinner(match_id:int, reason: ReasonWinning, db):
     player_service.delete_player(player_id)
     match_service.update_match(match_id, "FINISHED", 0)
 
-    msg = {"key": "WINNER", "payload":{"player_id": player_id, "ReasonWinning": reason}}
+    msg = {"key": "WINNER", "payload":{"player_id": player_id, "Reason": reason}}
     await manager.broadcast_to_game(match_id, msg)
 
 @router.delete("/{match_id}/left/{player_id}")
@@ -54,7 +54,7 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         
         match_service.update_match(match_id, match_to_leave.state, match_to_leave.current_players - 1)
         
-        if (match_to_leave.current_players - 1) == 0:
+        if (match_to_leave.current_players) == 1:
             await playerWinner(match_id, ReasonWinning.FORFEIT, db)
         
         msg = {"key": "PLAYER_LEFT", "payload":{"name": player_name}}
