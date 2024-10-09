@@ -1,6 +1,4 @@
 from pydantic import BaseModel
-from app.models.models import Matches, Players, Boards, Tiles, ShapeCards, MovementCards
-
 
 class MatchCreateIn(BaseModel):
     lobby_name: str
@@ -18,15 +16,9 @@ class MatchOut(BaseModel):
     max_players: int
     current_players: int
 
-    class Config:
-        orm_mode = True
-
 
 class MatchCreateOut(MatchOut):
     player_name: str
-
-    class Config:
-        orm_mode = True
 
 
 class PlayerJoinIn(BaseModel):
