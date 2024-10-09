@@ -66,21 +66,6 @@ class MovementCardService:
         except NoResultFound:
             raise MovementCardNotFound(movement_card_id)
 
-    def get_movement_card_by_user(self, player_owner: int) -> List[MovementCards]:
-        """
-        Obtiene la lista de cartas de movimiento de un usuario.
-
-        Args:
-            player_owner : Id del propietario de las cartas.
-        Returns:
-            MovementCards: Lista de movement_cards.
-        """
-        movement_cards = self.db.query(MovementCards).filter(
-            MovementCards.player_owner == player_owner).all()
-        if not movement_cards:
-            raise MovementCardNotFound(
-                f"No movement cards found for player owner {player_owner}")
-        return movement_cards
 
     def get_movement_card_by_user(self, player_owner: int) -> List[MovementCards]:
         """
