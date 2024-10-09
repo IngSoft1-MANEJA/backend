@@ -1,6 +1,7 @@
 import enum
 
-class Shapes(enum.Enum): # To define the shapes
+
+class Shapes(enum.Enum):  # To define the shapes
     T = 1
     INVERSE_SNAKE = 2
     SNAKE = 3
@@ -19,8 +20,9 @@ class Shapes(enum.Enum): # To define the shapes
     U = 16
     PLUS = 17
     DOG = 18
-    
-class Movements(enum.Enum): # To define the movements
+
+
+class Movements(enum.Enum):  # To define the movements
     DIAGONAL = 'Diagonal'
     INVERSE_DIAGONAL = 'Inverse Diagonal'
     LINE = 'Line'
@@ -28,15 +30,16 @@ class Movements(enum.Enum): # To define the movements
     LINE_BORDER = "Line Border"
     L = "L"
     INVERSE_L = "Inverse L"
-    
+
+
 class Colors(enum.Enum):
     RED = 'red'
     GREEN = 'green'
     BLUE = 'blue'
     YELLOW = 'yellow'
 
+
 class MatchState(enum.Enum):
     WAITING = "WAITING"
     STARTED = "STARTED"
     FINISHED = "FINISHED"
-    
