@@ -1,5 +1,6 @@
-from sqlalchemy.exc import NoResultFound
 from typing import List
+from sqlalchemy.exc import NoResultFound
+
 from app.models.models import Tiles
 from app.utils.utils import validate_color, validate_position
 from app.exceptions import TileNotFound, NoTilesFound
@@ -8,13 +9,6 @@ from app.exceptions import TileNotFound, NoTilesFound
 class TileService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Tiles
-    Metodos:
-            - __init__
-            - create_tile
-            - get_all_tiles
-            - get_tile_by_id
-            - update_tile_color
-            - delete_tile
     """
 
     def __init__(self, db):

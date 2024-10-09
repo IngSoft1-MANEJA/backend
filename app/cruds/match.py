@@ -1,6 +1,7 @@
+from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
-from typing import List
+
 from app.models.models import Matches
 from app.models.enums import MatchState
 import app.utils.utils as utils
@@ -9,14 +10,6 @@ import app.utils.utils as utils
 class MatchService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Matches:
-        Metodos disponibles:
-            -  __init__
-            - create_match
-            - get_match_id
-            - get_match_by_id
-            - get_all_matches
-            - update_match
-            - delete_match (El cliente desea que no se eliminen matches, pero se puede agregar)
     """
 
     def __init__(self, db: Session):

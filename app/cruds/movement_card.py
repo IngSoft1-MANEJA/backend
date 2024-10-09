@@ -1,8 +1,8 @@
+from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
-from typing import List
+
 from app.models.models import MovementCards
-from app.database import engine
 from app.utils.utils import validate_movement
 from app.exceptions import MovementCardNotFound, NoMovementCardsFound
 
@@ -10,14 +10,6 @@ from app.exceptions import MovementCardNotFound, NoMovementCardsFound
 class MovementCardService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de MovementCards
-    Metodos: 
-        - __init__
-        - create_movement_card
-        - get_movement_cards
-        - get_movement_card_by_id
-        - get_movement_card_by_user
-        - delete_movement_card
-        - delete_movement_card_from_user
     """
 
     def __init__(self, db: Session):

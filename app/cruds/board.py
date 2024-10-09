@@ -1,5 +1,7 @@
-from sqlalchemy.exc import NoResultFound
 from typing import List
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import NoResultFound
+
 from app.models.models import Boards
 from app.utils.utils import validate_color, validate_turn, validate_board
 
@@ -7,16 +9,9 @@ from app.utils.utils import validate_color, validate_turn, validate_board
 class BoardService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Boards
-    Metodos:
-            - __init__
-            - create_board
-            - get_all_boards
-            - get_board_by_id
-            - update_ban_color
-            - delete_board
     """
 
-    def __init__(self, db):
+    def __init__(self, db: Session):
         """ Constructor de la clase, guardamos en el atributo
             db: La session de la base de datos."""
         self.db = db

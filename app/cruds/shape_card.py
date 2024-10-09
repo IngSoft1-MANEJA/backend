@@ -1,16 +1,12 @@
+from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
-from typing import List
+
 from app.models.models import ShapeCards
-from app.database import engine
 from app.utils.utils import validate_shape, validate_add_shape_card_to_hand
 
 
-class Service():
-    pass
-
-
-class ShapeCardService(Service):
+class ShapeCardService():
     """
     Servicio para realizar operaciones CRUD sobre la tabla de ShapeCards
     """

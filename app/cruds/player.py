@@ -1,6 +1,7 @@
+from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
-from typing import List
+
 from app.models.models import Players
 from app.utils.utils import validate_player_name
 
@@ -8,15 +9,6 @@ from app.utils.utils import validate_player_name
 class PlayerService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Players
-    Metodos:
-        - __init__ 
-        - create_player
-        - get_player_id
-        - get_players
-        - get_player_by_id
-        - get_user_turn_order
-        - update_turn_order
-        - delete_player
     """
 
     def __init__(self, db: Session):
