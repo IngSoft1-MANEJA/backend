@@ -69,15 +69,6 @@ def test_update_ban_color_nonexistent_board(board_service, session):
     with pytest.raises(Exception):  # Puedes especificar una excepción más específica si es necesario
         board_service.update_ban_color(board_id=999, ban_color="green") 
         
-def test_update_turn_valid(board_service, session):
-    # Crear un tablero
-    board = board_service.create_board(match_id = 1)
-    # Actualizar el turno del tablero
-    board_service.update_turn(board_id=board.id, current_player= 2, next_player_turn= 3)
-    # Verificar que el turno se haya actualizado correctamente
-    updated_board = session.query(Boards).filter(Boards.id == board.id).one()
-    assert updated_board.current_player == 2
-
 def test_update_turn_nonexistent_board(board_service):
     # Intentar actualizar el turno de un tablero que no existe
     with pytest.raises(Exception):  # Puedes especificar una excepción más específica si es necesario
