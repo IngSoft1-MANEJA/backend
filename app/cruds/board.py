@@ -1,23 +1,20 @@
+from typing import List
+from sqlalchemy.orm import Session
 from itertools import cycle
 from random import shuffle
-from typing import List
+
 from app.cruds.tile import TileService
 from app.models.enums import Colors
 from app.models.models import Boards, Tiles
 from app.utils.utils import validate_color, validate_turn, validate_board
 
+
 class BoardService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Boards
-    Metodos:
-            - __init__
-            - create_board
-            - get_all_boards
-            - get_board_by_id
-            - update_ban_color
-            - delete_board
     """
-    def __init__(self, db):
+
+    def __init__(self, db: Session):
         """ Constructor de la clase, guardamos en el atributo
             db: La session de la base de datos."""
         self.db = db
@@ -90,7 +87,7 @@ class BoardService:
         boards = self.db.query(Boards).all()
         return boards
 
-    def get_board_by_id(self, board_id : int) -> Boards:
+    def get_board_by_id(self, board_id: int) -> Boards:
         """
         Obtiene un tablero de la base de datos por su id.
         Args:
@@ -102,7 +99,7 @@ class BoardService:
         validate_board(board.id)
         return board
 
-    def update_ban_color(self, board_id : int, ban_color : str):
+    def update_ban_color(self, board_id: int, ban_color: str):
         """
         Actualiza el color del ban de un tablero.
         Args:
@@ -115,7 +112,7 @@ class BoardService:
         board.ban_color = ban_color
         self.db.commit()
 
-    def delete_board(self, board_id : int):
+    def delete_board(self, board_id: int):
         """
         Elimina un tablero de la base de datos.
         Args:
@@ -126,7 +123,7 @@ class BoardService:
         self.db.delete(board)
         self.db.commit()
 
-    def update_turn(self, board_id : int, current_player : int, next_player_turn : int):
+    def update_turn(self, board_id: int, current_player: int, next_player_turn: int):
         """
         Actualiza el turno de los jugadores.
         Args:

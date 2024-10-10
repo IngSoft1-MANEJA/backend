@@ -1,82 +1,54 @@
 import pytest
-from sqlalchemy.orm import sessionmaker
-from app.database import engine, Init_Session, init_db, delete_db
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
-from app.models.models import Matches, Players
+from app.models.models import Players
 import app.exceptions as e
+from tests.config import *
 
-# Configuración de la sesión
-Session = sessionmaker(bind=engine)
 
-@pytest.fixture
-def session():
-    # Creo las tablas
-    init_db()
-    session = Session()
-    yield session
-    session.close()
-
-@pytest.fixture
-def player_service(session):
-    return PlayerService(session)
-
-"""
-    Methods for PlayerService to test:
-        - get_players
-        - create_player
-        - get_player_id
-        - get_player_by_id
-        - update_player
-        - delete_player (The client does not want to delete players, but it can be added)
-"""
-
-def test_get_players(player_service: PlayerService, session):
+def test_get_players(player_service: PlayerService, db_session):
     players = player_service.get_players()
     assert len(players) == 0
-    try: 
-        session2 = Session()
-        list_players = [
-            {'name': 'Player 1', 'match_to_link': 3,
-                'owner': True, 'token': 'token1', 'turn_order': 2},
-            {'name': 'Player 2', 'match_to_link': 3,
-                'owner': False, 'token': 'token2', 'turn_order': 1}
-        ]
-        for player in list_players:
-            new_player = Players(player_name=player['name'], match_id=player['match_to_link'],
-                is_owner=player['owner'], session_token=player['token'], turn_order=player['turn_order'])
-            session2.add(new_player)
-            session2.commit()
-        players2 = player_service.get_players()
-        assert len(players2) == 2
-    finally:
-        session2.close()
-        
-def test_create_player(player_service: PlayerService, session):
-    number_players = session.query(Players).count()
+    list_players = [
+        {'name': 'Player 1', 'match_to_link': 3, 'owner': True, 'token': 'token1', 'turn_order': 2},
+        {'name': 'Player 2', 'match_to_link': 3, 'owner': False, 'token': 'token2', 'turn_order': 1}
+    ]
+    for player in list_players:
+        new_player = Players(player_name=player['name'], match_id=player['match_to_link'],
+                             is_owner=player['owner'], session_token=player['token'], turn_order=player['turn_order'])
+        db_session.add(new_player)
+        db_session.commit()
+    players2 = player_service.get_players()
+    assert len(players2) == 2
+
+
+def test_create_player(player_service: PlayerService, db_session):
+    number_players = db_session.query(Players).count()
     player_service.create_player('Test Player', 1, True, 'token123')
-    try:
-        session2 = Session()
-        new_number_players = session2.query(Players).count()
-    finally:
-        session2.close()
+    new_number_players = db_session.query(Players).count()
     assert new_number_players == number_players + 1
+
 
 def test_create_player_raises_exception(player_service: PlayerService):
     with pytest.raises(e.PlayerNameInvalid):
         player_service.create_player('M@nuel', 1, True, 'token123')
-    
-def test_get_player_id(player_service: PlayerService, session):
-    player = player_service.create_player('Test-Player-Id', 1, True, 'tokenid1')
+
+
+def test_get_player_id(player_service: PlayerService, db_session):
+    player = player_service.create_player(
+        'Test-Player-Id', 1, True, 'tokenid1')
     # obtengo el id del player recién creado
-    player_id = session.query(Players).filter(Players.player_name == 'Test-Player-Id').first().id
+    player_id = db_session.query(Players).filter(
+        Players.player_name == 'Test-Player-Id').first().id
     # obtengo el id del player usando el servicio
     player_id2 = player_service.get_player_id(player)
     # Verifico que el id del player devuelto es el esperado
     assert player_id == player_id2
-    
-def test_get_player_by_id(player_service: PlayerService, session):
-    player = player_service.create_player('Test-Player-GetId', 1, True, 'tokenid1')
+
+
+def test_get_player_by_id(player_service: PlayerService):
+    player = player_service.create_player(
+        'Test-Player-GetId', 1, True, 'tokenid1')
     # obtengo el id del player recién creado
     player_id = player_service.get_player_id(player)
     # obtengo el player usando el servicio
@@ -84,8 +56,10 @@ def test_get_player_by_id(player_service: PlayerService, session):
     # Verifico que los valores del diccionario devuelto son los esperados
     assert player == player2
 
-def test_update_player(player_service: PlayerService, session):
-    player = player_service.create_player('Test-Player-Update', 1, True, 'tokenid341')
+
+def test_update_player(player_service: PlayerService):
+    player = player_service.create_player(
+        'Test-Player-Update', 1, True, 'tokenid341')
     # obtengo el id del player recién creado
     player_id = player_service.get_player_id(player)
     # actualizo el player
@@ -96,16 +70,40 @@ def test_update_player(player_service: PlayerService, session):
     assert player_get.match_id == 2
     assert player_get.turn_order == 4
 
-def test_delete_player(player_service: PlayerService, session):
-    match = MatchService(session)
+
+def test_delete_player(player_service: PlayerService, db_session):
+    match = MatchService(db_session)
     match.create_match('Test-Match-Delete', 3, True)
-    player = player_service.create_player('Test-Player-Delete', 1, True, 'tokenidelete1')
-    number_players = session.query(Players).count()
+    player = player_service.create_player(
+        'Test-Player-Delete', 1, True, 'tokenidelete1')
+    number_players = db_session.query(Players).count()
     player_id = player_service.get_player_id(player)
     player_service.delete_player(player_id)
-    try:
-        session2 = Session()
-        new_number_players = session2.query(Players).count()
-    finally:
-        session2.close()
+    new_number_players = db_session.query(Players).count()
     assert new_number_players == number_players - 1
+
+def test_get_players_by_match(player_service: PlayerService, match_service: MatchService, db_session):
+    # Crear un match y jugadores
+    match = match_service.create_match('Test-Match', 3, True)
+    players = player_service.get_players_by_match(match.id)
+    print("1", players)
+    player1 = player_service.create_player('Player1', match.id, False, 'token')
+    player2 = player_service.create_player('Player2', match.id, False, 'token2')
+    
+    # Obtener la lista de jugadores por match_id
+    players = player_service.get_players_by_match(match.id)
+    print(players)
+    # Verificar que la lista de jugadores es correcta
+    assert len(players) == 2
+    assert players[0].id == player1.id
+    assert players[1].id == player2.id
+
+def test_get_players_by_match_no_players(player_service: PlayerService, match_service: MatchService, db_session):
+    # Crear un match sin jugadores
+    match = match_service.create_match('Test-Match-No-Players', 3, True)
+    
+    # Obtener la lista de jugadores por match_id
+    players1 = player_service.get_players_by_match(match.id)
+    print("a", players1)
+    # Verificar que la lista de jugadores está vacía
+    assert len(players1) == 0
