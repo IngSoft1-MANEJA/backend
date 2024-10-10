@@ -4,7 +4,6 @@ from app.cruds.shape_card import ShapeCardService
 from app.cruds.player import PlayerService
 from app.models.models import ShapeCards
 import app.exceptions as e
-from tests.config import *
 
 
 def test_get_shape_cards(shape_service: ShapeCardService, db_session):

@@ -1,9 +1,8 @@
 from fastapi.testclient import TestClient
 from fastapi import WebSocket
-
+import pytest
 from app.exceptions import *
 from app.routers.matches import manager as manager2
-from tests.config import *
 
 
 def test_connect_player_to_game_success(app, manager):

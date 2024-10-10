@@ -2,12 +2,9 @@ from itertools import cycle
 from random import seed, shuffle
 from unittest import mock
 
-
 from app.cruds.board import BoardService
 from app.models.enums import Colors
 from app.models.models import Boards, Tiles
-
-from .config import *
 
 
 @mock.patch(

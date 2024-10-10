@@ -1,7 +1,6 @@
 from app.cruds.match import MatchService
 from app.models.models import Matches
 from app.models.enums import MatchState
-from tests.config import *
 
 
 def test_get_matches(match_service: MatchService, db_session):

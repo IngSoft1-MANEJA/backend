@@ -1,18 +1,14 @@
 from random import seed
 import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from fastapi import status
 
 from app.cruds.board import BoardService
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
-from app.connection_manager import manager as app_conn_manager
-from app.main import app
-from app.database import Base, get_db, init_db, delete_db, engine
 from app.models import Matches, Players
-from tests.config import *
+from app.connection_manager import manager
+from app.models.models import Boards, Tiles
+
 
 def test_create_match(client, db_session):
     response = client.post(
@@ -47,7 +43,7 @@ def test_create_match(client, db_session):
     assert player.session_token == "testtoken"
 
 
-def test_create_match_invalid_data(client, db_session):
+def test_create_match_invalid_data(client):
     # Prueba con datos inválidos
     response = client.post(
         "/matches/",
@@ -103,15 +99,25 @@ def test_get_match_by_id_invalid_id(client):
     assert response.status_code == 404  # Not Found
 
 
-def test_join_match_success(client, load_data_for_test, manager):
+def test_join_match_success(client, load_matches, db_session):
+    manager.create_game_connection(3)
+    match = db_session.query(Matches).filter(Matches.id == 3).first()
+    current_players = match.current_players
+    response = client.post("/matches/3", json={"player_name": "Player 4"})
+    assert response.status_code == status.HTTP_200_OK
+    match = db_session.query(Matches).filter(Matches.id == 3).first()
+    assert match.current_players == current_players + 1
+
+
+def test_start_match_success(client, load_matches):
     manager.create_game_connection(1)
-    with client.websocket_connect("/matches/1/ws/1") as websocket:
-        player_name = "Test Player 2"
-        response = client.post(
-            "/matches/1/", json={"player_name": player_name})
-        assert response.status_code == status.HTTP_200_OK
-        data = websocket.receive_json()
-        assert data == {"key": "PLAYER_JOIN", "payload":{"name": player_name}}
+    with client.websocket_connect("/matches/1/ws/1") as ws1, client.websocket_connect("/matches/1/ws/2") as ws2:
+        response = client.patch("/matches/1/start/1")
+        assert response.status_code == 200
+        data = ws1.receive_json()
+        assert data['key'] == "START_MATCH"
+        data = ws2.receive_json()
+        assert data['key'] == "START_MATCH"
 
 
 class TestStartMatchEndpoint:
@@ -127,7 +133,7 @@ class TestStartMatchEndpoint:
         db_session.query(Matches).filter(Matches.id == match.id).delete()
         db_session.commit()
 
-        app_conn_manager._games.pop(match.id, None)
+        manager._games.pop(match.id, None)
 
     def test_start_match(
         self,
@@ -140,7 +146,7 @@ class TestStartMatchEndpoint:
         player_service_a = PlayerService(db_session)
         board_service_a = BoardService(db_session)
 
-        match = match_service_a.create_match("Test match", 4, True)
+        match = match_service_a.create_match("Test match", 3, True)
         owner = player_service_a.create_player("test_owner", match.id, True, "testtoken")
         players = []
         for i in range(1, 3):
@@ -152,7 +158,7 @@ class TestStartMatchEndpoint:
         match.current_players += 3
         db_session.commit()
 
-        app_conn_manager.create_game_connection(match.id)
+        manager.create_game_connection(match.id)
         with client.websocket_connect(
             f"/matches/{match.id}/ws/{owner.id}"
         ) as websocket1, client.websocket_connect(
@@ -218,3 +224,4 @@ class TestStartMatchEndpoint:
                 },
                 {"player_name": owner.player_name, "turn_order": owner.turn_order},
             ]
+    
