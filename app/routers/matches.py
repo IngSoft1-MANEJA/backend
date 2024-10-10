@@ -14,9 +14,15 @@ router = APIRouter(prefix="/matches")
 
 
 @router.websocket("/{game_id}/ws/{player_id}")
-async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket):
+async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
     try:
+        if manager._games == {}:
+            match_service = MatchService(db)
+            matches = match_service.get_all_matches()
+            match_ids = [match.id for match in matches]
+            for match_id in match_ids:
+                manager.create_game_connection(match_id)
         try:
             manager.connect_player_to_game(game_id, player_id, websocket)
             await manager.keep_alive(websocket)
@@ -77,23 +83,20 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
-
         if match.current_players >= match.max_players:
             raise HTTPException(status_code=404, detail="Match is full")
         player_service = PlayerService(db)
-
         player = player_service.create_player(
             playerJoinIn.player_name, match_id, False, "123")
         match.current_players = match.current_players + 1
         players = [player.player_name for player in match.players]
         db.commit()
-
         msg = {"key": "PLAYER_JOIN", "payload": {"name": player.player_name}}
 
         await manager.broadcast_to_game(match_id, msg)
         return {"player_id": player.id, "players": players}
-    except:
-        raise HTTPException(status_code=404, detail="Match not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error DB")
 
 
 @router.patch("/{match_id}/start/{player_id}", status_code=200)
@@ -101,7 +104,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
-        if match.current_players < 2 or match.state != MatchState.WAITING.value:
+        if match.current_players < match.max_players or match.state != MatchState.WAITING.value:
             raise HTTPException(status_code=404, detail="Match not found")
         player_service = PlayerService(db)
         player = player_service.get_player_by_id(player_id)
