@@ -111,7 +111,6 @@ class MatchService:
     
     
     def update_match(self, match_id: int, new_state: str = None, new_amount_players: int = None):
-    def update_match(self, match_id: int, new_state: str = None, new_amount_players: int = None):
         """
             Actualiza los atributos de un match en la database.
 
