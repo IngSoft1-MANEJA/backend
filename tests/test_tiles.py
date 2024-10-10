@@ -1,7 +1,7 @@
 from app.models.models import Tiles
 from app.cruds.tile import TileService
 import app.exceptions as e
-from tests.config import *
+import pytest
 
 def test_create_tile_valid(tile_service : TileService, db_session):
     currently = db_session.query(Tiles).count()

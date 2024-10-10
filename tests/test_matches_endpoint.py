@@ -1,7 +1,10 @@
 from fastapi import status
-
+from unittest.mock import patch, MagicMock
 from app.models import Matches, Players
-from tests.config import *
+from typing import List
+from app.connection_manager import manager
+from app.logger import logger
+
 
 def test_create_match(client, db_session):
     response = client.post(
@@ -36,7 +39,7 @@ def test_create_match(client, db_session):
     assert player.session_token == "testtoken"
 
 
-def test_create_match_invalid_data(client, db_session):
+def test_create_match_invalid_data(client):
     # Prueba con datos inválidos
     response = client.post(
         "/matches/",
@@ -92,12 +95,22 @@ def test_get_match_by_id_invalid_id(client):
     assert response.status_code == 404  # Not Found
 
 
-def test_join_match_success(client, load_data_for_test, manager):
+def test_join_match_success(client, load_matches, db_session):
+    manager.create_game_connection(3)
+    match = db_session.query(Matches).filter(Matches.id == 3).first()
+    current_players = match.current_players
+    response = client.post("/matches/3", json={"player_name": "Player 4"})
+    assert response.status_code == status.HTTP_200_OK
+    match = db_session.query(Matches).filter(Matches.id == 3).first()
+    assert match.current_players == current_players + 1
+
+
+def test_start_match_success(client, load_matches):
     manager.create_game_connection(1)
-    with client.websocket_connect("/matches/1/ws/1") as websocket:
-        player_name = "Test Player 2"
-        response = client.post(
-            "/matches/1/", json={"player_name": player_name})
-        assert response.status_code == status.HTTP_200_OK
-        data = websocket.receive_json()
-        assert data == {"key": "PLAYER_JOIN", "payload": {"name": player_name}}
+    with client.websocket_connect("/matches/1/ws/1") as ws1, client.websocket_connect("/matches/1/ws/2") as ws2:
+        response = client.patch("/matches/1/start/1")
+        assert response.status_code == 200
+        data = ws1.receive_json()
+        assert data['key'] == "START_MATCH"
+        data = ws2.receive_json()
+        assert data['key'] == "START_MATCH"

@@ -3,7 +3,6 @@ from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.models.models import Players
 import app.exceptions as e
-from tests.config import *
 
 
 def test_get_players(player_service: PlayerService, db_session):
