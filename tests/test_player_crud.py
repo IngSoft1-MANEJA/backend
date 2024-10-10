@@ -81,3 +81,29 @@ def test_delete_player(player_service: PlayerService, db_session):
     player_service.delete_player(player_id)
     new_number_players = db_session.query(Players).count()
     assert new_number_players == number_players - 1
+
+def test_get_players_by_match(player_service: PlayerService, match_service: MatchService, db_session):
+    # Crear un match y jugadores
+    match = match_service.create_match('Test-Match', 3, True)
+    players = player_service.get_players_by_match(match.id)
+    print("1", players)
+    player1 = player_service.create_player('Player1', match.id, False, 'token')
+    player2 = player_service.create_player('Player2', match.id, False, 'token2')
+    
+    # Obtener la lista de jugadores por match_id
+    players = player_service.get_players_by_match(match.id)
+    print(players)
+    # Verificar que la lista de jugadores es correcta
+    assert len(players) == 2
+    assert players[0].id == player1.id
+    assert players[1].id == player2.id
+
+def test_get_players_by_match_no_players(player_service: PlayerService, match_service: MatchService, db_session):
+    # Crear un match sin jugadores
+    match = match_service.create_match('Test-Match-No-Players', 3, True)
+    
+    # Obtener la lista de jugadores por match_id
+    players1 = player_service.get_players_by_match(match.id)
+    print("a", players1)
+    # Verificar que la lista de jugadores está vacía
+    assert len(players1) == 0

@@ -43,3 +43,7 @@ class MatchState(enum.Enum):
     WAITING = "WAITING"
     STARTED = "STARTED"
     FINISHED = "FINISHED"
+    
+class ReasonWinning(enum.Enum):
+    NORMAL = "NORMAL"
+    FORFEIT = "FORFEIT"

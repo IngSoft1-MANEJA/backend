@@ -136,6 +136,18 @@ class PlayerService:
         except NoResultFound:
             raise ValueError("No player with that id")
 
+    def get_players_by_match(self, match_id: int) -> List[Players]:
+        """
+            Obtiene la lista de jugadores asociados a un match.
+            
+            Args:
+                match_id: Id del match.
+            Returns:
+                Players: Lista de jugadores.
+        """
+        players = self.db.query(Players).filter(Players.match_id == match_id).all()
+        return players
+    
     def get_user_turn_order(self, id: int) -> int:
         """
             Obtiene el orden de turno actual.

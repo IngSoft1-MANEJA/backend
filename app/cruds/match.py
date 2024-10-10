@@ -31,8 +31,8 @@ class MatchService:
         try:
             utils.validate_match_name(name)
             utils.validate_max_players(max_players)
-            match = Matches(match_name=name, max_players=max_players,
-                            is_public=public, state=MatchState.WAITING.value, current_players=1)
+            match = Matches(match_name=name, max_players=max_players, 
+                            is_public=public, state = MatchState.WAITING.value, current_players=0)
             self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
@@ -87,8 +87,9 @@ class MatchService:
             return matches
         except NoResultFound:
             raise NoResultFound("No matches found")
-
-    def update_match(self, match_id: int, new_state: str, new_amount_players: int):
+    
+    
+    def update_match(self, match_id: int, new_state: str = None, new_amount_players: int = None):
         """
             Actualiza los atributos de un match en la database.
 
@@ -101,8 +102,10 @@ class MatchService:
         """
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
-            match.state = new_state
-            match.current_players = new_amount_players
+            if new_state:
+                match.state = new_state
+            if new_amount_players != None:
+                match.current_players = new_amount_players
             # self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
