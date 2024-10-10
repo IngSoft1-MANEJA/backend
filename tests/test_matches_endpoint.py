@@ -1,7 +1,7 @@
 from fastapi import status
 
 from app.models import Matches, Players
-from tests.config import *
+
 
 def test_create_match(client, db_session):
     response = client.post(
@@ -90,6 +90,10 @@ def test_get_match_by_id(client):
 def test_get_match_by_id_invalid_id(client):
     response = client.get("/matches/999999")
     assert response.status_code == 404  # Not Found
+
+
+def test_start_match_success(client, db_session, manager, load_data_for_test):
+    assert 0 == 0
 
 
 def test_join_match_success(client, load_data_for_test, manager):

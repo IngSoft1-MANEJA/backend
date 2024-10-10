@@ -3,7 +3,6 @@ import pytest
 from app.models.models import Boards
 from app.cruds.board import BoardService
 import app.exceptions as e
-from tests.config import *
 
 def test_get_all_boards(board_service: BoardService, db_session):
     assert db_session.query(Boards).count() == 0

@@ -2,8 +2,7 @@ from app.models import MovementCards
 from app.cruds.movement_card import MovementCardService
 import app.exceptions as e
 from app.models.enums import Movements
-from tests.config import *
-
+import pytest
 
 def test_create_movement_card_valid(movement_card_service: MovementCardService, db_session):
     currently = db_session.query(MovementCards).count()
