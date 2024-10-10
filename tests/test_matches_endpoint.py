@@ -8,6 +8,7 @@ from fastapi import status
 from app.cruds.board import BoardService
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
+from app.connection_manager import manager as app_conn_manager
 from app.main import app
 from app.database import Base, get_db, init_db, delete_db, engine
 from app.models import Matches, Players
@@ -116,56 +117,42 @@ def test_join_match_success(client, load_data_for_test, manager):
 class TestStartMatchEndpoint:
 
     @pytest.fixture(scope="class")
-    def db(self):
-        db = TestingSessionLocal()
-        return db
+    def cleanup(self, match, db_session):
+        yield
 
-    @pytest.fixture(scope="class")
-    def match_service(self, db):
-        return MatchService(db)
+        db_session.query(Players).filter(Players.match_id == match.id).delete()
+        board = db_session.query(Boards).filter(Boards.match_id == match.id).first()
+        db_session.query(Tiles).filter(Tiles.board_id == board.id).delete()
+        db_session.query(Boards).filter(Boards.match_id == match.id).delete()
+        db_session.query(Matches).filter(Matches.id == match.id).delete()
+        db_session.commit()
 
-    @pytest.fixture(scope="class")
-    def player_service(self, db):
-        return PlayerService(db)
+        app_conn_manager._games.pop(match.id, None)
 
-    @pytest.fixture(scope="class")
-    def match(self, match_service):
-        match = match_service.create_match("Test match", 4, True)
-        return match
+    def test_start_match(
+        self,
+        client,
+        db_session,
+    ):
+        seed(49)
 
-    @pytest.fixture(scope="class")
-    def owner(self, player_service, match):
-        owner = player_service.create_player("test_owner", match.id, True, "testtoken")
-        return owner
+        match_service_a = MatchService(db_session)
+        player_service_a = PlayerService(db_session)
+        board_service_a = BoardService(db_session)
 
-    @pytest.fixture(scope="class")
-    def players(self, player_service, match):
+        match = match_service_a.create_match("Test match", 4, True)
+        owner = player_service_a.create_player("test_owner", match.id, True, "testtoken")
         players = []
         for i in range(1, 3):
-            player = player_service.create_player(
+            player = player_service_a.create_player(
                 f"test_player_{i}", match.id, False, "testtoken"
             )
             players.append(player)
-        return players
-
-    @pytest.fixture(scope="class")
-    def cleanup(self, match, db):
-        yield
-
-        db.query(Players).filter(Players.match_id == match.id).delete()
-        board = db.query(Boards).filter(Boards.match_id == match.id).first()
-        db.query(Tiles).filter(Tiles.board_id == board.id).delete()
-        db.query(Boards).filter(Boards.match_id == match.id).delete()
-        db.query(Matches).filter(Matches.id == match.id).delete()
-        db.commit()
-
-    def test_start_match(self, match, owner, players, db):
-        seed(49)
 
         match.current_players += 3
-        db.commit()
+        db_session.commit()
 
-        manager.create_game_connection(match.id)
+        app_conn_manager.create_game_connection(match.id)
         with client.websocket_connect(
             f"/matches/{match.id}/ws/{owner.id}"
         ) as websocket1, client.websocket_connect(
@@ -177,13 +164,12 @@ class TestStartMatchEndpoint:
             response = client.patch(f"/matches/{match.id}/start/{owner.id}")
             assert response.status_code == status.HTTP_200_OK
 
-            board_service = BoardService(db)
-            board = db.query(Boards).filter(Boards.match_id == match.id).first()
-            board_table = board_service.get_board_table(board.id)
+            board = db_session.query(Boards).filter(Boards.match_id == match.id).first()
+            board_table = board_service_a.get_board_table(board.id)
 
-            db.refresh(owner)
-            db.refresh(players[0])
-            db.refresh(players[1])
+            owner = db_session.query(Players).filter(Players.match_id == match.id, Players.is_owner == True).first()
+
+            players = db_session.query(Players).filter(Players.match_id == match.id, Players.is_owner == False).all()
 
             data = websocket1.receive_json()
             assert data["key"] == "START_MATCH"

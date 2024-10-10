@@ -7,6 +7,8 @@ from app.cruds.board import BoardService
 from app.models.enums import Colors
 from app.models.models import Boards, Tiles
 
+from .config import *
+
 
 @mock.patch(
     "app.cruds.board.TileService.create_tile", return_value=None
@@ -42,11 +44,11 @@ def test_init_board(mock_create_tile: mock.Mock):
     db.commit.assert_called_once()
 
 
-def test_board_table_property(db):
+def test_board_table_property(db_session):
 
     board = Boards(match_id=1)
-    db.add(board)
-    db.commit()
+    db_session.add(board)
+    db_session.commit()
 
     colors = [color.value for color in Colors]
 
@@ -57,13 +59,13 @@ def test_board_table_property(db):
             tile = Tiles(
                 board_id=board.id, color=next(colors_iter), position_x=i, position_y=j
             )
-            db.add(tile)
+            db_session.add(tile)
 
-    db.commit()
+    db_session.commit()
 
     expected_table = [[next(colors_iter) for _ in range(6)] for _ in range(6)]
 
-    board_service = BoardService(db)
+    board_service = BoardService(db_session)
     board_table = board_service.get_board_table(board.id)
     
     assert board_table == expected_table
