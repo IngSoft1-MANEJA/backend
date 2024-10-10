@@ -1,9 +1,10 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, WebSocketException, Depends, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 
+from app.cruds.board import BoardService
 from app.exceptions import *
-from app.connection_manager import ConnectionManager, manager
+from app.connection_manager import manager
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.models.enums import *
@@ -106,17 +107,43 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
         match = match_service.get_match_by_id(match_id)
         if match.current_players < match.max_players or match.state != MatchState.WAITING.value:
             raise HTTPException(status_code=404, detail="Match not found")
+
         player_service = PlayerService(db)
         player = player_service.get_player_by_id(player_id)
+
         if player.is_owner and player.match_id == match_id:
+
             match.state = MatchState.STARTED.value
-            db.commit()
-            # TODO SWT-17 and SWT-18
-            msg = {
-                "key": "START_MATCH",
-                "payload": {}
-            }
-            await manager.broadcast_to_game(match_id, msg)
+            # TODO SWT-18
+
+            players_order = match_service.set_players_order(match)
+
+            board_service = BoardService(db)
+            board = board_service.create_board(match_id)
+            board_service.init_board(board.id)
+
+            board_table = board_service.get_board_table(board.id)
+
+            for player_i in players_order:
+                # TODO: SWT-18 y SWT-19
+
+                msg = {
+                    "key": "START_MATCH",
+                    "payload": {
+                        "player_name": player_i.player_name,
+                        "turn_order": player_i.turn_order,
+                        "board": board_table,
+                        "opponents": [
+                            {
+                                "player_name": opponent.player_name,
+                                "turn_order": opponent.turn_order,
+                            }
+                            for opponent in players_order
+                            if opponent.id != player_i.id
+                        ],
+                    },
+                }
+                await manager.send_to_player(match_id, player_i.id, msg)
             return None
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:

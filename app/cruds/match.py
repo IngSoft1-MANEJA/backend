@@ -1,8 +1,9 @@
-from typing import List
+from copy import copy
+from random import shuffle
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
-
-from app.models.models import Matches
+from typing import List
+from app.models.models import Matches, Players
 from app.models.enums import MatchState
 import app.utils.utils as utils
 
@@ -40,7 +41,27 @@ class MatchService:
         except Exception as e:
             raise e
 
-    def get_match_by_id(self, match_id: int):
+    def set_players_order(self, match: Matches) -> List[Players]:
+        """Setea el orden de los jugadores en el match de manera random.
+
+        Setea el current_player_turn a 1.
+        
+        Returns:
+            List[Players]: Lista de jugadores con el orden seteado.
+        """
+        players = self.db.query(Players).filter(Players.match_id == match.id).all()
+        shuffle(players)
+
+        for i, player in enumerate(players, start=1):
+            player.turn_order = i
+
+        match.current_player_turn = 1
+
+        self.db.commit()
+
+        return players
+
+    def get_match_by_id(self, match_id: int):        
         """
             Obtiene un match segun el id dado.
 

@@ -1,8 +1,11 @@
 from typing import List
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import NoResultFound
+from itertools import cycle
+from random import shuffle
 
-from app.models.models import Boards
+from app.cruds.tile import TileService
+from app.models.enums import Colors
+from app.models.models import Boards, Tiles
 from app.utils.utils import validate_color, validate_turn, validate_board
 
 
@@ -16,11 +19,12 @@ class BoardService:
             db: La session de la base de datos."""
         self.db = db
 
-    def create_board(self, match_id: int, ban_color: str = None, current_player: int = None, next_player_turn: int = None):
+    def create_board(self, match_id : int, ban_color : str = None):
         """
         Crea un nuevo tablero en la base de datos.
         Args:
             match_id: Id de la partida a la cual pertenece el tablero.
+            ban_color: Color del ban.
         Returns:
             new_board: Tablero creado.
         """
@@ -28,16 +32,51 @@ class BoardService:
         if ban_color:
             validate_color(ban_color)
             new_board.ban_color = ban_color
-        if current_player:
-            validate_turn(current_player, next_player_turn, new_board.id)
-            new_board.current_player = current_player
-        if next_player_turn:
-            validate_turn(current_player, next_player_turn, new_board.id)
-            new_board.next_player_turn = next_player_turn
 
         self.db.add(new_board)
         self.db.commit()
         return new_board
+
+    def init_board(self, board_id: int):
+        """Initializes the board with the tiles.
+
+        Args:
+            board_id (int): Id of the board in the db.
+        """
+
+        table = [color.value for color in Colors] * 9
+        shuffle(table)
+
+        tile_service = TileService(self.db)
+        table_iter = iter(table)
+        for i in range(6):
+            for j in range(6):
+                color = next(table_iter)
+                tile_service.create_tile(board_id, color, i, j)
+
+        self.db.commit()
+
+    def get_board_table(self, board_id: int) -> List[List[str]]:
+        """Obtiene la representacion del tablero en una matriz de colores.
+
+        Args:
+            board_id (int): id de la tabla a obtener.
+
+        Returns:
+            List[List[str]]: matriz de colores del tablero.
+        """
+
+        tiles = (
+            self.db.query(Tiles)
+            .filter(Tiles.board_id == board_id)
+            .order_by(Tiles.position_x, Tiles.position_y)
+            .all()
+        )
+        board = [
+            [tile.color for tile in tiles[i * 6 : (i + 1) * 6]]
+            for i in range(6)
+        ]
+        return board
 
     def get_all_boards(self) -> List[Boards]:
         """
