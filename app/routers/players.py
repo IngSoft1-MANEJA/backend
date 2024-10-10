@@ -70,3 +70,6 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
+    
+    
+# Method to give movement card to player

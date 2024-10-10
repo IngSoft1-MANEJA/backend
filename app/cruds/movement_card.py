@@ -17,22 +17,23 @@ class MovementCardService:
             db: La session de la base de datos."""
         self.db = db
 
-    def create_movement_card(self, mov_type: str, player_owner: id = None):
+    def create_movement_card(self, mov_type: str, match_id: int, player_owner: id = None):
         """
             Crea una nueva instancia de carta de movimiento en la base de datos.
 
             Args:
-                movement: movimiento de la carta.
-                color: color de la carta.
+                mov_type: tipo de movimiento de la carta.
+                match_id: id del match al que pertenece la carta.
+                player_owner: id del jugador propietario de la carta, si no se especifica se asigna None.
             Returns:
                 movement_card: el objeto movement_card creado.
         """
         validate_movement(mov_type)
         if player_owner is None:
-            movement_card = MovementCards(mov_type=mov_type)
+            movement_card = MovementCards(mov_type=mov_type, match_id = match_id)
         else:
             movement_card = MovementCards(
-                mov_type=mov_type, player_owner=player_owner)
+                mov_type=mov_type, player_owner=player_owner, match_id = match_id)
         self.db.add(movement_card)
         self.db.commit()
         self.db.refresh(movement_card)
@@ -116,3 +117,34 @@ class MovementCardService:
         for movement_card in movement_cards:
             self.db.delete(movement_card)
         self.db.commit()
+
+    def get_movement_card_by_match(self, match_id: int) -> List[MovementCards]:
+        """
+        Obtiene la lista de cartas de movimiento de un match.
+
+        Args:
+            match_id : Id del match.
+        Returns:
+            MovementCards: Lista de movement_cards.
+        """
+        movement_cards = self.db.query(MovementCards).filter(
+            MovementCards.match_id == match_id).all()
+        if not movement_cards:
+            raise NoMovementCardsFound(match_id)
+        return movement_cards
+    
+    def add_movement_card_to_player(self, player_id: int, movement_card_id: int):
+        """
+        Agrega una carta de movimiento a un jugador.
+
+        Args:
+            player_id : Id del jugador.
+            movement_card_id : Id de la carta de movimiento.
+        Returns:
+            none.
+        """
+        movement_card = self.get_movement_card_by_id(movement_card_id)
+        movement_card.player_owner = player_id
+        self.db.commit()
+        self.db.refresh(movement_card)
+        return movement_card

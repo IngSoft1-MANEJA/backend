@@ -147,3 +147,12 @@ class ShapeCardService():
         except NoResultFound:
             raise NoResultFound(
                 f"ShapeCard with id {shape_card_id} not found, can't update")
+
+    def get_visible_cards(self, player_id: int) -> List[ShapeCards]:
+        try:
+            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id)
+            return cards
+        
+        # REVISAR CUANDO SEA 0
+        except NoResultFound:
+            raise NoResultFound(f"Player with id {player_id} has not visible cards")

@@ -1,6 +1,6 @@
 import re
 import app.exceptions as e
-from app.models.enums import Movements, Colors, Shapes
+from app.models.enums import *
 # Definir caracteres inválidos para nombres de partidas
 INVALID_CHARACTERS = set("!@#$%^&*()+=[]{}|\\;:'\",<>/?`~")
 
@@ -12,9 +12,11 @@ MAX_PLAYERS = 4
 BOARD_SIZE_X = 6
 BOARD_SIZE_Y = 6
 
+MAX_SHAPE_CARDS = 50
+
 # Definir colores válidos para el ban
-VALID_COLORS = Colors._value2member_map_.keys()
-VALID_SHAPES = Shapes._value2member_map_.keys()
+VALID_COLORS = [color.value for color in Colors]
+VALID_SHAPES = [shape.value for shape in HardShapes] + [shape.value for shape in EasyShapes]
 VALID_MOVEMENTS = Movements._value2member_map_.keys()
 
 def validate_match_name(name: str):

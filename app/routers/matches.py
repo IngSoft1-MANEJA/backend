@@ -1,15 +1,20 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
+from random import randint, shuffle
+
 
 from app.cruds.board import BoardService
 from app.exceptions import *
 from app.connection_manager import manager
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
+from app.cruds.movement_card import MovementCardService
+from app.cruds.shape_card import ShapeCardService
 from app.models.enums import *
 from app.schemas import *
 from app.database import get_db
+from app.utils.utils import MAX_SHAPE_CARDS
 
 router = APIRouter(prefix="/matches")
 
@@ -99,23 +104,86 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error DB")
 
+# ==================================== Auxiliares para el inicio de la partida ====================================
+
+# Funcion que crea un mazo de cartas de movimiento: 7 cartas de cada tipo de movimiento
+def create_movement_deck(db: Session, match_id: int):
+    movement_service = MovementCardService(db)
+    
+    for mov in Movements: # Por cada tipo de enum
+        for _ in range(7):
+            movement_service.create_movement_card(mov.value, match_id)
+
+# Method to give movement card to player
+async def give_movement_card_to_player(player_id: int, db: Session):
+    player = PlayerService(db).get_player_by_id(player_id)
+    movement_service = MovementCardService(db)
+    movements_given = [] # Lista de movimientos que se le dan al jugador
+    
+    while len(player.movement_cards) < 3:
+        movements = movement_service.get_movement_card_by_match(player.match_id)
+        movement = movements[randint(0, len(movements) - 1)]
+        MovementCardService(db).add_movement_card_to_player(player_id, movement.id)
+        movements_given.append((movement.id, movement.mov_type)) # Agrego a la lista dada
+               
+    msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
+            "payload": {"player": player.player_name}}
+    manager.broadcast_to_game(player.match_id, msg_all)
+        
+    msg_user = {"key": "GET_MOVEMENT_CARD",
+                "payload": {"movement_card": movements_given}}
+    manager.send_to_player(player.match_id, player_id, msg_user)
+    
+
+async def give_shape_card_to_player(player_id: int, db: Session):
+    player= PlayerService(db).get_player_by_id(player_id)
+    ShapeDeck = ShapeCardService(db).get_shape_card_by_player(player_id)
+    CardsToGive = 3 - len(ShapeCardService(db).get_visible_cards(player_id))
+    ShapesGiven = []
+    
+    for i in range(CardsToGive):
+        ShapeCardService(db).update_shape_card(ShapeDeck[i].id, True, False)
+        ShapesGiven.append((ShapeDeck[i].id, ShapeDeck[i].shape))
+        
+    msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
+            "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
+    manager.broadcast_to_game(player.match_id, msg_all)
+
+    return None
+
+# =============================================================================================================
 
 @router.patch("/{match_id}/start/{player_id}", status_code=200)
 async def start_match(match_id: int, player_id: int, db: Session = Depends(get_db)):
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
+        movement_service = MovementCardService(db)
+        shape_service = ShapeCardService(db)
         if match.current_players < match.max_players or match.state != MatchState.WAITING.value:
             raise HTTPException(status_code=404, detail="Match not found")
 
         player_service = PlayerService(db)
         player = player_service.get_player_by_id(player_id)
-
+        
         if player.is_owner and player.match_id == match_id:
 
             match.state = MatchState.STARTED.value
             # TODO SWT-18
+            
+            # ============== SHAPES ==================================
+            shapes = [(shape.value, True) for shape in HardShapes] * 2
+            shapes += [(shape.value, False) for shape in EasyShapes] * 2
+            shuffle(shapes)
+            
+            for player in match.players:
+                for _ in range(int(MAX_SHAPE_CARDS / match.max_players)):
+                    shape = shapes.pop()
+                    shape_service.create_shape_card(shape[0], shape[1], False, player.id)
 
+            # ==================== MOVEMENTS ==========================
+            # CREA 3 CARTAS AL AZAR PARA CADA JUGADOR
+            # ===========================================================
             players_order = match_service.set_players_order(match)
 
             board_service = BoardService(db)
@@ -148,3 +216,5 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
+
+

@@ -1,26 +1,14 @@
 from typing import List
-from .enums import Colors, Shapes, Movements, MatchState
+from .enums import Colors, HardShapes, EasyShapes, Movements, MatchState
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates, DeclarativeBase
 from sqlalchemy import String, Integer, Boolean, ForeignKey
-
+from app.utils.utils import VALID_SHAPES
 # ================================================ MATCHES MODELS =================================#
 
 class Base(DeclarativeBase):
     pass
 
 class Matches(Base):
-    """
-        Model of the Matches table in the database.
-        Attributes:
-            - id: int, primary key.
-            - match_name: str, name of the match.
-            - state: Enum State, indicates the state of the match.
-            - current_players: int, amount of players in the match.
-            - max_players: int, maximum amount of players in the match.
-        Relationships:
-            - players: List[Players], list of players in the match.
-            - board: Boards, the board of the match.
-    """
     __tablename__ = 'matches'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
@@ -43,15 +31,19 @@ class Matches(Base):
                                            uselist=False,
                                            post_update=True,
                                            passive_deletes=True)
-
+    movement_cards: Mapped[List["MovementCards"]] = relationship("MovementCards",
+                                                                 back_populates="match",
+                                                                 cascade="all, delete-orphan",
+                                                                 post_update=True,
+                                                                 passive_deletes=True)
     # --------------------------------- VALIDATORS -------------------------#
     @validates('state')
     def validate_state(self, key, state):
         if state not in MatchState._value2member_map_.keys():
             raise ValueError(f"State {state} is not a valid state")
         return state
-    # --------------------------------- REPR --------------------------------#
 
+    # --------------------------------- REPR --------------------------------#
     def __repr__(self):
         return (f"Match(id={self.id!r}, match_name={self.match_name!r}, "
                 f"state={self.state!r}, is_public={self.is_public!r}, "
@@ -235,7 +227,7 @@ class ShapeCards(Base):
     # --------------------------------- VALIDATORS -------------------------#
     @validates('shape_type')
     def validate_shape(self, key, shape):
-        if shape not in Shapes._value2member_map_.keys():
+        if shape not in VALID_SHAPES:
             raise ValueError(f"Shape {shape} is not valid shape type")
         return shape
 
@@ -249,26 +241,17 @@ class ShapeCards(Base):
 
 
 class MovementCards(Base):
-    """
-        Model of the MovementCards table in the database.
-        Attributes:
-            - id: int, primary key.
-            - mov_type: str, movement of the card.
-            - player_owner: int, foreign key to the player that owns the card.
-        Relationships:
-            - owner: Players, relationship to the player that owns the card.
-    """
     __tablename__ = 'movementCards'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     mov_type: Mapped[str]
-    player_owner: Mapped[int] = mapped_column(
-        Integer, ForeignKey('players.id'), nullable=True)
+    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
+    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
-    owner: Mapped["Players"] = relationship(
-        "Players", back_populates="movement_cards", post_update=True)
+    owner: Mapped["Players"] = relationship("Players", back_populates="movement_cards", post_update=True)
+    match: Mapped["Matches"] = relationship("Matches", back_populates="movement_cards")
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('mov_type')
