@@ -93,5 +93,4 @@ class ConnectionManager:
         conn: WebSocket = self._games[game_id][player_id]
         await conn.send_json(msg)
 
-
 manager = ConnectionManager()

@@ -129,11 +129,11 @@ async def give_movement_card_to_player(player_id: int, db: Session):
                
     msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
             "payload": {"player": player.player_name}}
-    manager.broadcast_to_game(player.match_id, msg_all)
+    await manager.broadcast_to_game(player.match_id, msg_all)
         
     msg_user = {"key": "GET_MOVEMENT_CARD",
                 "payload": {"movement_card": movements_given}}
-    manager.send_to_player(player.match_id, player_id, msg_user)
+    await manager.send_to_player(player.match_id, player_id, msg_user)
     
 async def give_shape_card_to_player(player_id: int, db: Session):
     player= PlayerService(db).get_player_by_id(player_id)
@@ -147,7 +147,7 @@ async def give_shape_card_to_player(player_id: int, db: Session):
         
     msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
             "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
-    manager.broadcast_to_game(player.match_id, msg_all)
+    await manager.broadcast_to_game(player.match_id, msg_all)
 
     return None
 
@@ -161,7 +161,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
         movement_service = MovementCardService(db)
         shape_service = ShapeCardService(db)
         if match.current_players < match.max_players or match.state != MatchState.WAITING.value:
-            raise HTTPException(status_code=404, detail="Match not found")
+            raise HTTPException(status_code=404, detail="Not enough players")
 
         player_service = PlayerService(db)
         player = player_service.get_player_by_id(player_id)
