@@ -47,7 +47,11 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
             raise WebSocketDisconnect
 
     except WebSocketDisconnect:
-        manager.disconnect_player_from_game(game_id, player_id)
+        try:
+            manager.disconnect_player_from_game(game_id, player_id)
+        except PlayerNotConnected:
+            # El jugador ya ha sido desconectado, no hacer nada
+            pass
 
 
 @router.get("/", response_model=list[MatchOut])
@@ -99,9 +103,13 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
         db.commit()
         msg = {"key": "PLAYER_JOIN", "payload": {"name": player.player_name}}
 
-        await manager.broadcast_to_game(match_id, msg)
+        try:
+            await manager.broadcast_to_game(match_id, msg)
+        except Exception as e:
+            print(f"Error al enviar mensaje: {e}")
         return {"player_id": player.id, "players": players}
     except Exception as e:
+        print("el error cuando se quiere unir es: ", e)
         raise HTTPException(status_code=500, detail="Error DB")
 
 # ==================================== Auxiliares para el inicio de la partida ====================================

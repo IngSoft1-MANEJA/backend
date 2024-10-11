@@ -13,7 +13,7 @@ from app.models.enums import ReasonWinning
 router = APIRouter(prefix="/matches")
 
 
-async def playerWinner(match_id:int, reason: ReasonWinning, db):
+async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     match_service = MatchService(db)
     player_service = PlayerService(db) 
     
@@ -21,9 +21,15 @@ async def playerWinner(match_id:int, reason: ReasonWinning, db):
     player_id = players.id
     player_service.delete_player(player_id)
     match_service.update_match(match_id, "FINISHED", 0)
-
-    msg = {"key": "WINNER", "payload":{"player_id": player_id, "Reason": reason}}
-    await manager.broadcast_to_game(match_id, msg)
+    reason_winning = reason.value
+    
+    msg = {"key": "WINNER", "payload": {"player_id": player_id, "Reason": reason_winning}}
+    
+    try:
+        await manager.broadcast_to_game(match_id, msg)
+    except RuntimeError as e:
+        # Manejar el caso en que el WebSocket ya esté cerrado
+        print(f"Error al enviar mensaje: {e}")
 
 @router.delete("/{match_id}/left/{player_id}")
 async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
@@ -50,17 +56,23 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
         try:
             manager.disconnect_player_from_game(match_id, player_id)
-        except Exception as e:
-            raise HTTPException(status_code=404, detail="Player not connected to match")
+        except PlayerNotConnected:
+            # El jugador ya ha sido desconectado, no hacer nada
+            pass
         
         match_service.update_match(match_id, match_to_leave.state, match_to_leave.current_players - 1)
         
-        if (match_to_leave.current_players) == 1:
+        if (match_to_leave.current_players) == 1 and match_to_leave.state == "STARTED":
             await playerWinner(match_id, ReasonWinning.FORFEIT, db)
         
-        msg = {"key": "PLAYER_LEFT", "payload":{"name": player_name}}
+        msg = {"key": "PLAYER_LEFT", "payload": {"name": player_name}}
 
-        await manager.broadcast_to_game(match_id, msg)
+        try:
+            await manager.broadcast_to_game(match_id, msg)
+        except RuntimeError as e:
+            # Manejar el caso en que el WebSocket ya esté cerrado
+            print(f"Error al enviar mensaje: {e}")
+
         return {"player_id": player_id, "players": player_name}
 
     except PlayerNotConnected as e:
