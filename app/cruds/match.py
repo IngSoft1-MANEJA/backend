@@ -153,3 +153,14 @@ class MatchService:
                 f"Match with id {match_id} not found, can't delete")
         except Exception as e:
             raise e
+
+    def update_turn(self, match_id: int, turn: int):
+        try:
+            match = self.db.query(Matches).filter(Matches.id == match_id).one()
+            match.current_player_turn = turn
+            # self.db.add(match)
+            self.db.commit()
+            self.db.refresh(match)
+        except NoResultFound:
+            raise NoResultFound(
+                f"Match with id {match_id} not found, can't update")
