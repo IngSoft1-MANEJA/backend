@@ -5,7 +5,7 @@ from app.models.models import Base
 from app.config import DATABASE_FILENAME
 
 # Configuración de la base de datos
-engine = create_engine(f'sqlite:///{DATABASE_FILENAME}', echo=True)
+engine = create_engine(f'sqlite:///{DATABASE_FILENAME}')
 
 # Crea una sesión
 Init_Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)

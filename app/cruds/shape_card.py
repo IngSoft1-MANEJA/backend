@@ -150,7 +150,7 @@ class ShapeCardService():
 
     def get_visible_cards(self, player_id: int) -> List[ShapeCards]:
         try:
-            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id)
+            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(ShapeCards.is_visible == True).all()
             return cards
         
         # REVISAR CUANDO SEA 0

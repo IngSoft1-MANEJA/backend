@@ -260,5 +260,5 @@ class MovementCardNotFound(SwitcherException):
 
 class NoMovementCardsFound(SwitcherException):
     def __init__(self, player_owner: int):
-        message: str = "No movement cards found with player id {player_owner}"
+        message: str = f"No movement cards found with player id {player_owner}"
         super().__init__(message)

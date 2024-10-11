@@ -33,7 +33,7 @@ class MatchService:
             utils.validate_match_name(name)
             utils.validate_max_players(max_players)
             match = Matches(match_name=name, max_players=max_players, 
-                            is_public=public, state = MatchState.WAITING.value, current_players=0)
+                            is_public=public, state = MatchState.WAITING.value, current_players=1)
             self.db.add(match)
             self.db.commit()
             self.db.refresh(match)

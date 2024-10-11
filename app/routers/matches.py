@@ -125,6 +125,7 @@ async def give_movement_card_to_player(player_id: int, db: Session):
         movement = movements[randint(0, len(movements) - 1)]
         MovementCardService(db).add_movement_card_to_player(player_id, movement.id)
         movements_given.append((movement.id, movement.mov_type)) # Agrego a la lista dada
+        print("Las cartas del jugador son:", player.movement_cards)
                
     msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
             "payload": {"player": player.player_name}}
@@ -134,7 +135,6 @@ async def give_movement_card_to_player(player_id: int, db: Session):
                 "payload": {"movement_card": movements_given}}
     manager.send_to_player(player.match_id, player_id, msg_user)
     
-
 async def give_shape_card_to_player(player_id: int, db: Session):
     player= PlayerService(db).get_player_by_id(player_id)
     ShapeDeck = ShapeCardService(db).get_shape_card_by_player(player_id)
@@ -143,7 +143,7 @@ async def give_shape_card_to_player(player_id: int, db: Session):
     
     for i in range(CardsToGive):
         ShapeCardService(db).update_shape_card(ShapeDeck[i].id, True, False)
-        ShapesGiven.append((ShapeDeck[i].id, ShapeDeck[i].shape))
+        ShapesGiven.append((ShapeDeck[i].id, ShapeDeck[i].shape_type))
         
     msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
             "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
@@ -170,20 +170,19 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
             match.state = MatchState.STARTED.value
             # TODO SWT-18
-            
-            # ============== SHAPES ==================================
+            create_movement_deck(db, match_id)
+            # ===================== CONFIGURO LOS MAZOS ==================================
             shapes = [(shape.value, True) for shape in HardShapes] * 2
             shapes += [(shape.value, False) for shape in EasyShapes] * 2
             shuffle(shapes)
             
+            # Crea el mazo de figuras para cada jugador
             for player in match.players:
                 for _ in range(int(MAX_SHAPE_CARDS / match.max_players)):
                     shape = shapes.pop()
                     shape_service.create_shape_card(shape[0], shape[1], False, player.id)
-
-            # ==================== MOVEMENTS ==========================
-            # CREA 3 CARTAS AL AZAR PARA CADA JUGADOR
-            # ===========================================================
+                
+            # ==========================================================================
             players_order = match_service.set_players_order(match)
 
             board_service = BoardService(db)
@@ -193,8 +192,10 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             board_table = board_service.get_board_table(board.id)
 
             for player_i in players_order:
-                # TODO: SWT-18 y SWT-19
-
+                # TODO: SWT-18 y SWT-19 Doy cartas de movimiento y figuras a los jugadores
+                await give_shape_card_to_player(player_i.id, db)
+                await give_movement_card_to_player(player_i.id, db)
+                
                 msg = {
                     "key": "START_MATCH",
                     "payload": {
