@@ -201,8 +201,6 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
             for player_i in players_order:
                 # TODO: SWT-18 y SWT-19 Doy cartas de movimiento y figuras a los jugadores
-                await give_shape_card_to_player(player_i.id, db)
-                await give_movement_card_to_player(player_i.id, db)
                 
                 msg = {
                     "key": "START_MATCH",
@@ -219,8 +217,12 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
                             if opponent.id != player_i.id
                         ],
                     },
-                }
-                await manager.send_to_player(match_id, player_i.id, msg)
+                } 
+                
+            await manager.send_to_player(match_id, player_i.id, msg)
+            
+            await give_shape_card_to_player(player_i.id, db)
+            await give_movement_card_to_player(player_i.id, db)
             return None
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
