@@ -220,9 +220,11 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
                 } 
                 
                 await manager.send_to_player(match_id, player_i.id, msg)
-                
+
+            for player_i in players_order:
                 await give_shape_card_to_player(player_i.id, db)
                 await give_movement_card_to_player(player_i.id, db)
+            
             return None
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
