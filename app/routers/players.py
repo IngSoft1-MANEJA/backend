@@ -8,8 +8,8 @@ from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.connection_manager import manager
 from app.database import get_db
-from app.models.models import Players, Matches
 from app.models.enums import ReasonWinning
+from app.routers.matches import give_movement_card_to_player, give_shape_card_to_player
 
 router = APIRouter(prefix="/matches")
 
@@ -113,7 +113,10 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     print("dsps",match.current_player_turn)
     
     next_player = player_service.get_player_by_turn(turn_order= match.current_player_turn, match_id= match_id)
-
+    
+    # await give_movement_card_to_player(next_player.id, db, is_init=False) {Agregar en los test esto y luego descomentar}
+    # await give_shape_card_to_player(next_player.id, db, is_init=False) {Agregar en los test y luego descomentar}
+    
     msg = {
         "key": "END_PLAYER_TURN", 
         "payload": {

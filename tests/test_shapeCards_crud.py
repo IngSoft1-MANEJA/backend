@@ -144,7 +144,7 @@ def test_update_shape_card_not_found(shape_service: ShapeCardService):
 def test_get_visible_cards(shape_service: ShapeCardService, db_session):
     player_id = 1
     
-    visible_cards = shape_service.get_visible_cards(player_id)
+    visible_cards = shape_service.get_visible_cards(player_id, True)
     assert len(visible_cards) == 0
     
     shape_card1 = shape_service.create_shape_card(
@@ -154,7 +154,7 @@ def test_get_visible_cards(shape_service: ShapeCardService, db_session):
     shape_card3 = shape_service.create_shape_card(
         shape=7, is_hard=False, is_visible=False, player_owner=player_id)
 
-    visible_cards = shape_service.get_visible_cards(player_id)
+    visible_cards = shape_service.get_visible_cards(player_id, True)
     
     assert len(visible_cards) == 2
     assert shape_card1 in visible_cards
@@ -166,5 +166,5 @@ def test_get_visible_cards_not_found(shape_service: ShapeCardService):
     player_id = 999  # ID que no existe
 
     # Verificar que la lista de cartas visibles está vacía
-    visible_cards = shape_service.get_visible_cards(player_id)
+    visible_cards = shape_service.get_visible_cards(player_id, True)
     assert len(visible_cards) == 0

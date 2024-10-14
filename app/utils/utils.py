@@ -1,7 +1,6 @@
 import re
 import app.exceptions as e
 from app.models.enums import *
-# Definir caracteres inválidos para nombres de partidas
 INVALID_CHARACTERS = set("!@#$%^&*()+=[]{}|\\;:'\",<>/?`~")
 
 # Definir rango válido para el número máximo de jugadores

@@ -148,9 +148,15 @@ class ShapeCardService():
             raise NoResultFound(
                 f"ShapeCard with id {shape_card_id} not found, can't update")
 
-    def get_visible_cards(self, player_id: int) -> List[ShapeCards]:
+    def get_visible_cards(self, player_id: int, is_visible: bool) -> List[ShapeCards]:
+        """
+            Obtiene las cartas de figura de un jugador que son visibles o que no lo son.
+            Args:
+                - player_id : id del jugador.
+                - is_visible : booleano que indica si las cartas deseadas son visibles o no.
+        """
         try:
-            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(ShapeCards.is_visible == True).all()
+            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(ShapeCards.is_visible == is_visible).all()
             return cards
         
         # REVISAR CUANDO SEA 0
