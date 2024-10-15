@@ -12,6 +12,7 @@ from app.cruds.player import PlayerService
 from app.cruds.movement_card import MovementCardService
 from app.cruds.shape_card import ShapeCardService
 from app.models.enums import *
+from app.models.models import Matches, Players
 from app.schemas import *
 from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS
@@ -121,41 +122,57 @@ def create_movement_deck(db: Session, match_id: int):
         for _ in range(7):
             movement_service.create_movement_card(mov.value, match_id)
     
-async def give_movement_card_to_player(player_id: int, db: Session, is_init: bool):
+def give_movement_card_to_player(player_id: int, db: Session):
     """
         Da hasta 3 cartas de movimiento al jugador.
         Args:
             - player_id : id del jugador.
             - db : Session de la base de datos.
-            - is_init : booleano que indica si es el inicio de la partida.
         Returns:
-            None, comunica mediante websockets
+            Lista de cartas dadas al jugador.
     """
     player = PlayerService(db).get_player_by_id(player_id)
     match_id = player.match_id
-    players = PlayerService(db).get_players_by_match(match_id)
     movement_service = MovementCardService(db)
-    movements_given = []  # Lista de movimientos que se le dan al jugador
-
+    movements_given = []
+    
     while len(player.movement_cards) < 3:
         movements = movement_service.get_movement_card_by_match(match_id)
         movement = movements[randint(0, len(movements) - 1)]
         MovementCardService(db).add_movement_card_to_player(
             player_id, movement.id)
-        # Agrego a la lista dada
         movements_given.append((movement.id, movement.mov_type))
+        
+    return movements_given 
 
+async def notify_movement_card_to_player(player_id: int, match_id: int, buff_movement: list[tuple[int, str]]):
+    """
+        Notifica al jugador que se le dio una carta de movimiento.
+        Args:
+            - player_id : id del jugador.
+            - match_id : id de la partida.
+            - buff_movement : lista de tuplas con el id y tipo de movimiento.
+        Returns:
+            None, se comunica mediante websockets.
+    """
     msg_user = {"key": "GET_MOVEMENT_CARD",
-                "payload": {"movement_card": movements_given}}
+                "payload": {"movement_card": buff_movement}}
     await manager.send_to_player(match_id, player_id, msg_user)
 
-    # Se avisa a los demas jugadores que se le dio una carta de movimiento
-    if is_init == False:  # Si no es el inicio de la partida
-        for player_i in players:
-            if player_i.id != player_id:
-                msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
-                            "payload": {"player": player.player_name}}
-                await manager.broadcast_to_game(match_id, msg_all)
+async def notify_all_players_movements_received(player: Players, match: Matches):
+    """
+        Notifica a los demás jugadores que un jugador recibió una carta de movimiento.
+        Args:
+            - player : jugador que recibió la carta.
+            - match : partida en la que se encuentra.
+        Returns:
+            None, se comunica mediante websockets.
+    """
+    for player_i in match.players:
+        if player_i.id != player.id:
+            msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
+                        "payload": {"player": player.player_name}}
+            await manager.send_to_player(match.id, msg_all)
 
 
 async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
@@ -177,9 +194,9 @@ async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
         ShapeCardService(db).update_shape_card(shape.id, True, False)
         ShapesGiven.append((shape.id, shape.shape_type))
 
-    msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
-                "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
     if is_init == False:
+        msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
+                    "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
         await manager.broadcast_to_game(player.match_id, msg_all)
 # =============================================================================================================
 
@@ -218,12 +235,16 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             board_service = BoardService(db)
             board = board_service.create_board(match_id)  
             board_service.init_board(board.id)
+            _ = match_service.set_players_order(match) 
 
             for player_i in match.players:
                 msg = {"key": "START_MATCH",
                        "payload": {}}
                 await manager.send_to_player(match_id, player_i.id, msg)
-
+                
+                give_movement_card_to_player(player_i.id, db)
+                await give_shape_card_to_player(player_i.id, db, True)
+                
             return {"message": "Match started successfully"}
 
         raise HTTPException(status_code=404, detail="Match not found")
@@ -274,18 +295,25 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
     }
     await manager.send_to_player(match_id, player_id, msg_info)
 
-    # Se le envian las cartas de movimiento y figuras
-    await give_movement_card_to_player(player_id, db, True)
-    await give_shape_card_to_player(player_id, db, True)
+    # Se le envian las cartas de movimiento y figuras=
+    s_service = ShapeCardService(db)
+    m_service = MovementCardService(db)
     
+    payload_list = [] 
+    for player_i in players_in_match:
+        shapes_p = s_service.get_visible_cards(player_i.id, True)
+        all_shapes = [(shape.id, shape.shape_type) for shape in shapes_p]
+        
+        payload = {"player": player_i.player_name, "shape_cards": all_shapes}
+        payload_list.append(payload)
+         
     msg_shapes = {
         "key": "PLAYER_RECIEVE_ALL_SHAPES",
-        "payload": {[
-            {
-                "player": player.player_name,
-                "shape_cards": ShapeCardService(db).get_visible_cards(player_id, True)
-            }
-            for player_i in players_in_match
-        ]}
+        "payload": payload_list
     }
+    
     await manager.send_to_player(match_id, player_id, msg_shapes)
+
+    movements = m_service.get_movement_card_by_user(player_id)
+    all_movements = [(mov.id, mov.mov_type) for mov in movements]
+    await notify_movement_card_to_player(player_id, match_id, all_movements)
