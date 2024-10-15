@@ -1,3 +1,6 @@
+import pytest
+from sqlalchemy.orm.exc import NoResultFound
+
 from app.cruds.match import MatchService
 from app.models.models import Matches
 from app.models.enums import MatchState
@@ -68,3 +71,25 @@ def test_update_match(match_service: MatchService):
     match_info = match_service.get_match_by_id(match_id)
     assert match_info.current_players == 2
     assert match_info.state == MatchState.WAITING.value
+
+
+def test_update_turn_success(match_service: MatchService, db_session):
+    # Crear un match para la prueba
+    match_service.create_match('test_match', 4, True)
+    match = db_session.query(Matches).filter(Matches.match_name == 'test_match').one()
+    
+    # Actualizar el turno del match
+    new_turn = 2
+    match_service.update_turn(match.id, new_turn)
+    
+    # Verificar que el turno se ha actualizado correctamente
+    updated_match = db_session.query(Matches).filter(Matches.id == match.id).one()
+    assert updated_match.current_player_turn == new_turn
+
+def test_update_turn_failure(db_session, match_service: MatchService):
+    # Intentar actualizar el turno de un match que no existe
+    non_existent_match_id = 9999
+    new_turn = 2
+    
+    with pytest.raises(NoResultFound):
+        match_service.update_turn(non_existent_match_id, new_turn)

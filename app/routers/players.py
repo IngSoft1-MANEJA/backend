@@ -1,19 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
+from sqlalchemy import select
 
 from app.exceptions import *
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.connection_manager import manager
 from app.database import get_db
-from app.models.models import Players
 from app.models.enums import ReasonWinning
+from app.routers.matches import give_movement_card_to_player, give_shape_card_to_player
 
 router = APIRouter(prefix="/matches")
 
-
-async def playerWinner(match_id:int, reason: ReasonWinning, db):
+async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     match_service = MatchService(db)
     player_service = PlayerService(db) 
     
@@ -21,9 +21,15 @@ async def playerWinner(match_id:int, reason: ReasonWinning, db):
     player_id = players.id
     player_service.delete_player(player_id)
     match_service.update_match(match_id, "FINISHED", 0)
-
-    msg = {"key": "WINNER", "payload":{"player_id": player_id, "Reason": reason}}
-    await manager.broadcast_to_game(match_id, msg)
+    reason_winning = reason.value
+    
+    msg = {"key": "WINNER", "payload": {"player_id": player_id, "Reason": reason_winning}}
+    
+    try:
+        await manager.broadcast_to_game(match_id, msg)
+    except RuntimeError as e:
+        # Manejar el caso en que el WebSocket ya esté cerrado
+        print(f"Error al enviar mensaje: {e}")
 
 @router.delete("/{match_id}/left/{player_id}")
 async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
@@ -50,17 +56,23 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
         try:
             manager.disconnect_player_from_game(match_id, player_id)
-        except Exception as e:
-            raise HTTPException(status_code=404, detail="Player not connected to match")
+        except PlayerNotConnected:
+            # El jugador ya ha sido desconectado, no hacer nada
+            pass
         
         match_service.update_match(match_id, match_to_leave.state, match_to_leave.current_players - 1)
         
-        if (match_to_leave.current_players) == 1:
+        msg = {"key": "PLAYER_LEFT", "payload": {"name": player_name}}
+
+        try:
+            await manager.broadcast_to_game(match_id, msg)
+        except RuntimeError as e:
+            # Manejar el caso en que el WebSocket ya esté cerrado
+            print(f"Error al enviar mensaje: {e}")
+
+        if (match_to_leave.current_players) == 1 and match_to_leave.state == "STARTED":
             await playerWinner(match_id, ReasonWinning.FORFEIT, db)
         
-        msg = {"key": "PLAYER_LEFT", "payload":{"name": player_name}}
-
-        await manager.broadcast_to_game(match_id, msg)
         return {"player_id": player_id, "players": player_name}
 
     except PlayerNotConnected as e:
@@ -70,3 +82,48 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
+    
+
+@router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
+async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+
+    match = match_service.get_match_by_id(match_id= match_id)
+    if match is None:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    player = player_service.get_player_by_id(player_id)
+    if player is None:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    if player.turn_order != match.current_player_turn:
+        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
+    
+    print("antes",match.current_player_turn)
+    print("current player", match.current_player_turn)
+    
+    if match.current_player_turn == match.current_players:
+        print("entro aca")
+        match_service.update_turn(match_id, turn=1)
+    else :
+        print("no se xq estoy aca")
+        match_service.update_turn(match_id, match.current_player_turn + 1) 
+
+    print("dsps",match.current_player_turn)
+    
+    next_player = player_service.get_player_by_turn(turn_order= match.current_player_turn, match_id= match_id)
+    
+    # await give_movement_card_to_player(next_player.id, db, is_init=False) {Agregar en los test esto y luego descomentar}
+    # await give_shape_card_to_player(next_player.id, db, is_init=False) {Agregar en los test y luego descomentar}
+    
+    msg = {
+        "key": "END_PLAYER_TURN", 
+        "payload": {
+            "current_player_name": player.player_name,
+            "next_player_name": next_player.player_name,
+            "next_player_turn": next_player.turn_order
+        }
+    }
+    await manager.broadcast_to_game(match_id, msg)
+    

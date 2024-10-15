@@ -1,8 +1,10 @@
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from fastapi.middleware.cors import CORSMiddleware
-import pytest
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine
+
 from unittest.mock import patch
 
 from app.connection_manager import ConnectionManager
@@ -13,8 +15,7 @@ from app.cruds.player import PlayerService
 from app.cruds.shape_card import ShapeCardService
 from app.cruds.tile import TileService
 from app.models.enums import *
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+
 import os
 
 from app.models.models import Base
@@ -178,14 +179,14 @@ def load_data_for_test(db_session):
             'is_visible': False, 'is_blocked': False},
     ]
     list_movement_cards = [
-        {'player_owner': 1, 'movement': 'Inverse L'},
-        {'player_owner': 1, 'movement': 'Line Between'},
-        {'player_owner': 2, 'movement': 'Line Border'},
-        {'player_owner': 3, 'movement': 'L'},
-        {'player_owner': 4, 'movement': 'Diagonal'},
-        {'player_owner': 5, 'movement': 'Inverse Diagonal'},
-        {'player_owner': 5, 'movement': 'L'},
-        {'player_owner': 6, 'movement': 'Line'},
+        {'matchId': 1, 'player_owner': 1, 'movement': 'Inverse L'},
+        {'matchId': 1, 'player_owner': 1, 'movement': 'Line Between'},
+        {'matchId': 1, 'player_owner': 2, 'movement': 'Line Border'},
+        {'matchId': 2, 'player_owner': 3, 'movement': 'L'},
+        {'matchId': 2, 'player_owner': 4, 'movement': 'Diagonal'},
+        {'matchId': 3, 'player_owner': 5, 'movement': 'Inverse Diagonal'},
+        {'matchId': 3, 'player_owner': 5, 'movement': 'L'},
+        {'matchId': 3, 'player_owner': 6, 'movement': 'Line'},
     ]
 
     session = db_session
@@ -217,7 +218,7 @@ def load_data_for_test(db_session):
             session.commit()
         for movement_card in list_movement_cards:
             new_movement_card = MovementCards(
-                player_owner=movement_card['player_owner'], mov_type=movement_card['movement'])
+                player_owner=movement_card['player_owner'], mov_type=movement_card['movement'], match_id=movement_card['matchId'])
             session.add(new_movement_card)
             session.commit()
     finally:

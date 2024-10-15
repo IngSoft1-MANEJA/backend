@@ -53,15 +53,13 @@ class ConnectionManager:
         """
         if game_id not in self._games:
             raise GameConnectionDoesNotExist(game_id)
-
+        
         if player_id not in self._games[game_id]:
             raise PlayerNotConnected(game_id, player_id)
-
+        
         del self._games[game_id][player_id]
 
-        if len(self._games[game_id].keys()) == 0:
-            del self._games[game_id]
-
+        
     async def broadcast_to_game(self, game_id: int, msg: Any):
         """Sends message to all players in a game.
 
@@ -75,7 +73,7 @@ class ConnectionManager:
 
         for conn in self._games[game_id].values():
             await conn.send_json(msg)
-
+            
     async def send_to_player(self, game_id: int, player_id: int, msg: Any):
         """Sends message to a specific player in a game.
 
@@ -92,6 +90,5 @@ class ConnectionManager:
 
         conn: WebSocket = self._games[game_id][player_id]
         await conn.send_json(msg)
-
 
 manager = ConnectionManager()

@@ -61,7 +61,7 @@ def test_disconnect_player_from_game_success(app, manager):
 
     manager.disconnect_player_from_game(1, 2)
 
-    assert 1 not in manager._games
+    assert 2 not in manager._games[1]
 
 
 def test_disconnect_player_from_game_raise_exceptions(manager):
