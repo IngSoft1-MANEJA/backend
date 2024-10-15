@@ -278,11 +278,13 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
         raise HTTPException(
             status_code=404, detail="Error al obtener informacion de la partida")
 
+    current_player = PlayerService(db).get_player_by_turn(match.current_player_turn, match_id)
     msg_info = {
         "key": "GET_PLAYER_MATCH_INFO",
         "payload": {
             "turn_order": player.turn_order,
             "board": board_table,
+            "current_turn_player": current_player.player_name,
             "opponents": [
                 {
                     "player_name": opponent.player_name,

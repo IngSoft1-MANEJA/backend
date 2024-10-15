@@ -162,6 +162,6 @@ class PlayerService:
             raise ValueError("No player with that id")
         return player.turn_order
 
-    def get_player_by_turn(self, turn_order: int, match_id: int) -> int:
+    def get_player_by_turn(self, turn_order: int, match_id: int) -> Players:
         
         return self.db.query(Players).filter(Players.match_id == match_id).filter(Players.turn_order == turn_order).first()
