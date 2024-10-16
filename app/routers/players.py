@@ -1,3 +1,4 @@
+import copy
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
@@ -83,7 +84,7 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
     except PlayerNotConnected as e:
         raise HTTPException(
-            status_code=404, detail="Player not connected to match")
+            status_code=404, detail="Player not connected to match")    
     except GameConnectionDoesNotExist as e:
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
@@ -138,7 +139,10 @@ def validate_partial_move(partialMove: PartialMove):
     tile2 = partialMove.tiles[1]
     movement_card = partialMove.movement_card
     
-    if (tile1.rowIndex or tile1.columnIndex or tile2.rowIndex or tile2.columnIndex < 0) or (tile1.rowIndex or tile1.columnIndex or tile2.rowIndex or tile2.columnIndex >= 6):
+    if (tile1.rowIndex < 0 or tile1.rowIndex >= 6 or
+    tile1.columnIndex < 0 or tile1.columnIndex >= 6 or
+    tile2.rowIndex < 0 or tile2.rowIndex >= 6 or
+    tile2.columnIndex < 0 or tile2.columnIndex >= 6):
         raise HTTPException(status_code=400, detail="Tile position is invalid")
     
     #path = "validate_" + movement_card.lower()
@@ -167,27 +171,40 @@ def partial_move(match_id: int, player_id: int, partialMove: PartialMove, db: Se
     match_service = MatchService(db)
     player_service = PlayerService(db)
     
-    match = match_service.get_match_by_id(match_id)
-    if match is None:
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
     
-    player = player_service.get_player_by_id(player_id)
-    if player is None:
+    try:
+        player = player_service.get_player_by_id(player_id)
+    except ValueError:
         raise HTTPException(status_code=404, detail="Player not found")
     
     if player.turn_order != match.current_player_turn:
         raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
     
-    if validate_partial_move(partialMove):
-        tile_service = TileService(db)
-        board_service = BoardService(db)
-        
-        board = board_service.get_board_by_id(match_id)
-        tile1 = tile_service.get_tile_by_position(partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex, board.id)
-        tile2 = tile_service.get_tile_by_position(partialMove.tiles[1].rowIndex, partialMove.tiles[1].columnIndex, board.id)
+    try:
+        if validate_partial_move(partialMove):
+            tile_service = TileService(db)
+            board_service = BoardService(db)
+            
+            board = board_service.get_board_by_id(match_id)
+            tile1 = tile_service.get_tile_by_position(partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex, board.id)
+            tile2 = tile_service.get_tile_by_position(partialMove.tiles[1].rowIndex, partialMove.tiles[1].columnIndex, board.id)
+            print("tile 1 antes", partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex)
+            print("tile 1", tile1)
 
-        aux_tile = tile1
-        tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
-        tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
-        
-        board_service.update_list_of_parcial_movements(board.id, partialMove)
+            print("tile 2 antes", partialMove.tiles[1].rowIndex, partialMove.tiles[1].columnIndex)
+            print("tile 2", tile2)
+
+            aux_tile = copy.copy(tile1)
+            tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
+            tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
+            
+            board_service.update_list_of_parcial_movements(board.id, partialMove)
+        else:
+            raise HTTPException(status_code=400, detail="Invalid movement")
+    
+    except HTTPException as e:
+        raise e

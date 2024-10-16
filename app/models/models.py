@@ -133,8 +133,11 @@ class Boards(Base):
         "Matches", back_populates="board", lazy='joined', post_update=True)
     tiles: Mapped[List["Tiles"]] = relationship(
         "Tiles", back_populates="board", post_update=True, passive_deletes=True)
-    parcial_movements = [List["Tiles"]] 
+    parcial_movements = List[List["Tiles"]]
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.parcial_movements = []
     # --------------------------------- VALIDATORS -------------------------#
     @validates('ban_color')
     def validate_ban_color(self, key, color):
@@ -191,7 +194,7 @@ class Tiles(Base):
     # --------------------------------- REPR -------------------------------#
     def __repr__(self):
         return (f"Tile(id={self.id!r}, color={self.color!r}, "
-                f"positionX={self.positionX!r}, positionY={self.positionY!r}, "
+                f"position_x={self.position_x!r}, position_y={self.position_y!r}, "
                 f"board_id={self.board_id!r})")
 
 # ================================================ SHAPECARDS MODELS ==============================#
