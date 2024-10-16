@@ -36,8 +36,11 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
     try:
         match_service = MatchService(db)
         player_service = PlayerService(db)
-
-        player_to_delete = player_service.get_player_by_id(player_id)
+        try:
+            player_to_delete = player_service.get_player_by_id(player_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail=f"Player not found with id: {player_id}") 
+               
         match_to_leave = match_service.get_match_by_id(match_id)
 
         player_name = player_to_delete.player_name
@@ -63,7 +66,7 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         match_service.update_match(match_id, match_to_leave.state, match_to_leave.current_players - 1)
         
         msg = {"key": "PLAYER_LEFT", "payload": {"name": player_name}}
-
+        
         try:
             await manager.broadcast_to_game(match_id, msg)
         except RuntimeError as e:
@@ -100,17 +103,10 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     if player.turn_order != match.current_player_turn:
         raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
     
-    print("antes",match.current_player_turn)
-    print("current player", match.current_player_turn)
-    
     if match.current_player_turn == match.current_players:
-        print("entro aca")
         match_service.update_turn(match_id, turn=1)
-    else :
-        print("no se xq estoy aca")
+    else:
         match_service.update_turn(match_id, match.current_player_turn + 1) 
-
-    print("dsps",match.current_player_turn)
     
     next_player = player_service.get_player_by_turn(turn_order= match.current_player_turn, match_id= match_id)
     
