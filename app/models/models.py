@@ -127,12 +127,13 @@ class Boards(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     ban_color: Mapped[str] = mapped_column(String(50), nullable=True)
     match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
-
+    
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship(
         "Matches", back_populates="board", lazy='joined', post_update=True)
     tiles: Mapped[List["Tiles"]] = relationship(
         "Tiles", back_populates="board", post_update=True, passive_deletes=True)
+    parcial_movements = [List["Tiles"]] 
 
     # --------------------------------- VALIDATORS -------------------------#
     @validates('ban_color')

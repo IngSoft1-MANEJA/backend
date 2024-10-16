@@ -141,6 +141,9 @@ def validate_partial_move(partialMove: PartialMove):
     if (tile1.rowIndex or tile1.columnIndex or tile2.rowIndex or tile2.columnIndex < 0) or (tile1.rowIndex or tile1.columnIndex or tile2.rowIndex or tile2.columnIndex >= 6):
         raise HTTPException(status_code=400, detail="Tile position is invalid")
     
+    #path = "validate_" + movement_card.lower()
+    #path(tile1, tile2)
+    
     if movement_card == "DIAGONAL":
         return validate_diagonal(tile1, tile2)
     elif movement_card == "INVERSE_DIAGONAL":
@@ -186,6 +189,5 @@ def partial_move(match_id: int, player_id: int, partialMove: PartialMove, db: Se
         aux_tile = tile1
         tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
         tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
-    # await make_partial_move(match_id, player_id, partialMove, db) 
-    
-    return {"player_id": player_id, "partial_move": partialMove.dict()} 
+        
+        board_service.update_list_of_parcial_movements(board.id, partialMove)
