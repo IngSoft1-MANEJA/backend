@@ -80,7 +80,7 @@ class MovementCardService:
         movement_cards = self.db.query(MovementCards).filter(
             MovementCards.player_owner == player_owner).all()
         if not movement_cards:
-            raise NoMovementCardsFound(player_owner)
+            return []
         return movement_cards
 
     def delete_movement_card(self, movement_card_id: int):
@@ -148,3 +148,16 @@ class MovementCardService:
         self.db.commit()
         self.db.refresh(movement_card)
         return movement_card
+    
+    def get_movement_cards_without_owner(self, match_id: int) -> List[MovementCards]:
+        """
+        Obtiene la lista de cartas de movimiento sin jugadores asignados.
+        Args:
+            - match_id : Id del match.
+        Returns:
+            MovementCards: Lista de movement_cards.
+        """
+        movement_cards = self.db.query(MovementCards).filter(
+            MovementCards.match_id == match_id, 
+            MovementCards.player_owner == None).all()
+        return movement_cards
