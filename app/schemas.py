@@ -1,3 +1,4 @@
+from typing import List
 from pydantic import BaseModel
 
 class MatchCreateIn(BaseModel):
@@ -27,3 +28,13 @@ class PlayerJoinIn(BaseModel):
 
 class PlayerJoinOut(BaseModel):
     player_id: int
+
+
+class Tile(BaseModel):
+    rowIndex: int
+    columnIndex: int
+
+
+class PartialMove(BaseModel):
+    tiles: List[Tile]
+    movement_card: str

@@ -81,3 +81,18 @@ class TileService:
         tile = self.db.query(Tiles).filter(Tiles.id == tile_id).one()
         self.db.delete(tile)
         self.db.commit()
+
+    def get_tile_by_position(self, position_x: int, position_y: int, board_id: int) -> Tiles:
+        """
+        Obtiene una ficha de la base de datos por su posición.
+        Args:
+            position_x: Posición x de la ficha.
+            position_y: Posición y de la ficha.
+        Returns:
+            tile: Ficha.
+        """
+        try:
+            tile = self.db.query(Tiles).filter(Tiles.position_x == position_x, Tiles.position_y == position_y, Tiles.board_id == board_id).one()
+            return tile
+        except NoResultFound:
+            raise NoResultFound("Tile not found with {position_x} and {position_y}")

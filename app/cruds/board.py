@@ -1,5 +1,6 @@
 from typing import List
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound
 from itertools import cycle
 from random import shuffle
 
@@ -7,7 +8,6 @@ from app.cruds.tile import TileService
 from app.models.enums import Colors
 from app.models.models import Boards, Tiles
 from app.utils.utils import validate_color, validate_turn, validate_board
-
 
 class BoardService:
     """
@@ -133,3 +133,18 @@ class BoardService:
         board = self.db.query(Boards).filter(Boards.id == board_id).one()
         board.current_player = board.next_player_turn
         self.db.commit()
+
+    def get_board_by_match_id(self, match_id: int) -> Boards:
+        """
+        Obtiene un tablero de la base de datos por su id de partida.
+        Args:
+            match_id: Id de la partida.
+        Returns:
+            board: Tablero.
+        """
+        try:
+            board = self.db.query(Boards).filter(Boards.match_id == match_id).one()
+            return board
+        
+        except NoResultFound:
+            raise NoResultFound("Board not found with match_id {match_id}")
