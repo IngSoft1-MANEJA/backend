@@ -124,26 +124,32 @@ def create_movement_deck(db: Session, match_id: int):
     
 def give_movement_card_to_player(player_id: int, db: Session):
     """
-        Da hasta 3 cartas de movimiento al jugador.
-        Args:
-            - player_id : id del jugador.
-            - db : Session de la base de datos.
-        Returns:
-            Lista de cartas dadas al jugador.
+    Da hasta 3 cartas de movimiento al jugador.
+    Args:
+        - player_id : id del jugador.
+        - db : Session de la base de datos.
+    Returns:
+        Lista de cartas dadas al jugador.
     """
-    player = PlayerService(db).get_player_by_id(player_id)
-    match_id = player.match_id
+    player_service = PlayerService(db)
     movement_service = MovementCardService(db)
+
+    player = player_service.get_player_by_id(player_id)
+    match_id = player.match_id
+    list_movs = player.movement_cards
+    movs_to_give = 3 - len(list_movs)
     movements_given = []
-    
-    while len(player.movement_cards) < 3:
-        movements = movement_service.get_movement_card_by_match(match_id)
+
+    while movs_to_give > 0:
+        movements = movement_service.get_movement_cards_without_owner(match_id)
+        if not movements:
+            break  # No hay más cartas en el mazo
         movement = movements[randint(0, len(movements) - 1)]
-        MovementCardService(db).add_movement_card_to_player(
-            player_id, movement.id)
+        movement_service.add_movement_card_to_player(player_id, movement.id)
         movements_given.append((movement.id, movement.mov_type))
-        
-    return movements_given 
+        movs_to_give -= 1
+
+    return movements_given
 
 async def notify_movement_card_to_player(player_id: int, match_id: int, buff_movement: list[tuple[int, str]]):
     """
@@ -185,18 +191,21 @@ async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
             - is_init : booleano que indica si es el inicio de la partida.
     """
     player = PlayerService(db).get_player_by_id(player_id)
+    visible_cards = ShapeCardService(db).get_visible_cards(player_id, True)
     ShapeDeck = ShapeCardService(db).get_visible_cards(player_id, False)
-    CardsToGive = 3 - len(ShapeCardService(db).get_visible_cards(player_id, True))
+    CardsToGive = 3 - len(visible_cards)
     ShapesGiven = []
 
     for i in range(CardsToGive):
-        shape = ShapeDeck[randint(0, len(ShapeDeck) - 1)]
+        if not ShapeDeck:
+            break  # No hay más cartas en el mazo
+        shape = ShapeDeck.pop(randint(0, len(ShapeDeck) - 1))
         ShapeCardService(db).update_shape_card(shape.id, True, False)
         ShapesGiven.append((shape.id, shape.shape_type))
 
-    if is_init == False:
+    if not is_init:
         msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
-                    "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
+                   "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
         await manager.broadcast_to_game(player.match_id, msg_all)
 # =============================================================================================================
 
@@ -306,7 +315,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
         shapes_p = s_service.get_visible_cards(player_i.id, True)
         all_shapes = [(shape.id, shape.shape_type) for shape in shapes_p]
         
-        payload = {"player": player_i.player_name, "shape_cards": all_shapes}
+        payload = {"turn_order": player_i.turn_order, "shape_cards": all_shapes}
         payload_list.append(payload)
          
     msg_shapes = {
