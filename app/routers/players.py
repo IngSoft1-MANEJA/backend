@@ -43,8 +43,11 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
     try:
         match_service = MatchService(db)
         player_service = PlayerService(db)
-
-        player_to_delete = player_service.get_player_by_id(player_id)
+        try:
+            player_to_delete = player_service.get_player_by_id(player_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail=f"Player not found with id: {player_id}") 
+               
         match_to_leave = match_service.get_match_by_id(match_id)
 
         player_name = player_to_delete.player_name
@@ -70,7 +73,7 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         match_service.update_match(match_id, match_to_leave.state, match_to_leave.current_players - 1)
         
         msg = {"key": "PLAYER_LEFT", "payload": {"name": player_name}}
-
+        
         try:
             await manager.broadcast_to_game(match_id, msg)
         except RuntimeError as e:
