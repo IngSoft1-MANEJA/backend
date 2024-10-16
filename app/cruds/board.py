@@ -123,17 +123,6 @@ class BoardService:
         self.db.delete(board)
         self.db.commit()
 
-    def update_turn(self, board_id: int, current_player: int, next_player_turn: int):
-        """
-        Actualiza el turno de los jugadores.
-        Args:
-            board_id: Id del tablero.
-        """
-        validate_turn(current_player, next_player_turn, board_id)
-        board = self.db.query(Boards).filter(Boards.id == board_id).one()
-        board.current_player = board.next_player_turn
-        self.db.commit()
-
     def get_board_by_match_id(self, match_id: int) -> Boards:
         """
         Obtiene un tablero de la base de datos por su id de partida.
@@ -158,11 +147,37 @@ class BoardService:
         """
         try:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
-            if len(board.list_of_parcial_movements) == 0:
-                board.list_of_parcial_movements = list_of_parcial_movements
-            else: 
-                board.list_of_parcial_movements += list_of_parcial_movements
+            board.add_temporary_movement(list_of_parcial_movements[0], list_of_parcial_movements[1]) 
             self.db.commit()
             
+        except NoResultFound:
+            raise NoResultFound("Board not found with id {board_id}")
+        
+    def print_temporary_movements(self, board_id: int):
+        """
+        Obtiene la lista de movimientos temporales de un tablero.
+        Args:
+            board_id: Id del tablero.
+        Returns:
+            list_of_parcial_movements: Lista de movimientos temporales.
+        """
+        try:
+            board = self.db.query(Boards).filter(Boards.id == board_id).one()
+            board.print_temporary_movements()
+        
+        except NoResultFound:
+            raise NoResultFound("Board not found with id {board_id}")
+        
+    def get_last_temporary_movements(self, board_id: int):
+        """
+        Elimina la lista de movimientos temporales de un tablero.
+        Args:
+            board_id: Id del tablero.
+        """
+        try:
+            board = self.db.query(Boards).filter(Boards.id == board_id).one()
+            movement = board.get_last_movement()
+            return movement
+        
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")

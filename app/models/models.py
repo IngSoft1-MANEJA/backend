@@ -1,4 +1,6 @@
 from typing import List
+
+from pytest import Session
 from .enums import Colors, HardShapes, EasyShapes, Movements, MatchState
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates, DeclarativeBase
 from sqlalchemy import String, Integer, Boolean, ForeignKey
@@ -106,7 +108,11 @@ class Players(Base):
                 f"is_owner={self.is_owner!r}, match_id={self.match_id!r})")
 
 # ================================================ BOARDS MODELS =================================#
-
+class TileMovement:
+    def __init__(self, tile1: "Tiles", tile2: "Tiles"):
+        self.tile1 = tile1
+        self.tile2 = tile2
+        
 
 class Boards(Base):
     """
@@ -127,30 +133,34 @@ class Boards(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     ban_color: Mapped[str] = mapped_column(String(50), nullable=True)
     match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
-    
+
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship(
         "Matches", back_populates="board", lazy='joined', post_update=True)
     tiles: Mapped[List["Tiles"]] = relationship(
         "Tiles", back_populates="board", post_update=True, passive_deletes=True)
-    parcial_movements = List[List["Tiles"]]
+        
+    # --------------------------------- TEMPORARY MOVEMENTS -----------------#
+    temporary_movements: Mapped[List["TileMovement"]] = []
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.parcial_movements = []
-    # --------------------------------- VALIDATORS -------------------------#
-    @validates('ban_color')
-    def validate_ban_color(self, key, color):
-        if color not in Colors._value2member_map_.keys():
-            raise ValueError(
-                f"Color {color} is not a valid color to ban, must be one of {Colors._value2member_map_.keys()}")
-        return color
-    
+        self.temporary_movements = []
 
-    # --------------------------------- REPR -------------------------------#
-    def __repr__(self):
-        return (f"Board(id={self.id!r}, match_id={self.match_id!r})")
+    def add_temporary_movement(self, tile1: "Tiles", tile2: "Tiles"):
+        movement = TileMovement(tile1, tile2)
+        self.temporary_movements.append(movement)
 
+    def get_last_movement(self):
+        print("no entre")
+        if len(self.temporary_movements) > 0:
+            print("entre")
+            last_movement = self.temporary_movements.pop()
+            return last_movement
+            
+    def print_temporary_movements(self):
+        for movement in self.temporary_movements:
+            print(f"Movement: {movement.tile1} -> {movement.tile2}")
 # ================================================ TILES MODELS ===================================#
 
 

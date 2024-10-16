@@ -202,9 +202,49 @@ def partial_move(match_id: int, player_id: int, partialMove: PartialMove, db: Se
             tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
             tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
             
-            board_service.update_list_of_parcial_movements(board.id, partialMove)
+            board_service.update_list_of_parcial_movements(board.id, [tile1, tile2])
+            board_service.print_temporary_movements(board.id)
         else:
             raise HTTPException(status_code=400, detail="Invalid movement")
     
     except HTTPException as e:
         raise e
+    
+
+@router.delete("/{match_id}/partial-move/{player_id}", status_code=200)
+def delete_partial_move(match_id: int, player_id: int, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+    
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    try:
+        player = player_service.get_player_by_id(player_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    if player.turn_order != match.current_player_turn:
+        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
+    
+    try:
+        tile_service = TileService(db)
+        board_service = BoardService(db)
+        
+        board = board_service.get_board_by_id(match_id)
+        last_movement = board_service.get_last_temporary_movements(board.id)
+        tile1 = last_movement.tile1
+        tile2 = last_movement.tile2
+    
+        aux_tile = copy.copy(tile1)
+        tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
+        tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
+        
+        board_service.print_temporary_movements(board.id)
+        
+    except HTTPException as e:
+        raise e
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Tile not found")
