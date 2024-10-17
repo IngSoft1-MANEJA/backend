@@ -81,6 +81,20 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
             # Manejar el caso en que el WebSocket ya esté cerrado
             print(f"Error al enviar mensaje: {e}")
 
+        # Si el jugador se quiere salir en su turno, debo pasar el turno al siguiente y luego avisar
+        if player_to_delete.turn_order == match_to_leave.current_player_turn:
+            next_player = end_turn_logic(player_to_delete, match_to_leave, db)
+            
+            msg= {
+                "key": "END_PLAYER_TURN", 
+                "payload": {
+                    "current_player_name": player_name,
+                    "next_player_name": next_player.player_name,
+                    "next_player_turn": next_player.turn_order
+                }
+            }
+            await manager.broadcast_to_game(match_id, msg)
+        
         if (match_to_leave.current_players) == 1 and match_to_leave.state == "STARTED":
             await playerWinner(match_id, ReasonWinning.FORFEIT, db)
         
@@ -125,11 +139,15 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     
     next_player = end_turn_logic(player, match, db)
     
+    print(f"Calling give_movement_card_to_player with player_id: {player_id}")
     movs = give_movement_card_to_player(player_id, db)
-    notify_movement_card_to_player(player_id, movs, db)
-    notify_all_players_movements_received(player, match)
+    print(f"Movements: {movs}")
     
-    await give_shape_card_to_player(next_player.id, db, is_init=False)
+    await notify_movement_card_to_player(player_id, match_id, movs)
+    print("Notified movements")
+    await notify_all_players_movements_received(player, match)
+    print("Notified all players movements received")
+    await give_shape_card_to_player(player.id, db, is_init=False)
     
     msg = {
         "key": "END_PLAYER_TURN", 
