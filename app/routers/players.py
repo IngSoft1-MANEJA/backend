@@ -132,7 +132,7 @@ def validate_partial_move(partialMove: PartialMove):
     if len(partialMove.tiles) != 2:
         raise HTTPException(status_code=400, detail="Partial move must have 2 tiles")
     
-    if partialMove.movement_card not in enums.Movements.value2member_map:
+    if partialMove.movement_card not in enums.Movements._value2member_map_:
         raise HTTPException(status_code=400, detail="Movement card not valid")
     
     tile1 = partialMove.tiles[0]
