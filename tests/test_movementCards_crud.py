@@ -72,11 +72,10 @@ def test_get_movement_card_by_user_valid(movement_card_service: MovementCardServ
         mov_type=Movements.DIAGONAL.value, match_id = 1, player_owner=2)
     assert movement_card_service.get_movement_card_by_user(
         player_owner=2)[0].mov_type == movement_card2.mov_type
-
-
-def test_get_movement_card_by_user_invalid(movement_card_service: MovementCardService):
-    with pytest.raises(e.NoMovementCardsFound):
-        movement_card_service.get_movement_card_by_user(player_owner=1)
+    
+def test_get_movement_card_by_user_empty(movement_card_service, db_session):
+    assert db_session.query(MovementCards).filter(MovementCards.player_owner == 1).count() == 0
+    assert movement_card_service.get_movement_card_by_user(player_owner=1) == []
 
 
 def test_delete_movement_card_from_user_valid(movement_card_service: MovementCardService, db_session):
