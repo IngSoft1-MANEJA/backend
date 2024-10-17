@@ -167,7 +167,7 @@ def validate_partial_move(partialMove: PartialMove):
 
     
 @router.post("/{match_id}/partial-move/{player_id}", status_code=200)
-def partial_move(match_id: int, player_id: int, partialMove: PartialMove, db: Session = Depends(get_db)):
+async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
     
@@ -206,7 +206,7 @@ def partial_move(match_id: int, player_id: int, partialMove: PartialMove, db: Se
             board_service.print_temporary_movements(board.id)
             board_table = board_service.get_board_table(board.id)
             msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"board": board_table}}
-            manager.broadcast_to_game(match_id, msg)
+            await manager.broadcast_to_game(match_id, msg)
         
         else:
             raise HTTPException(status_code=400, detail="Invalid movement")
