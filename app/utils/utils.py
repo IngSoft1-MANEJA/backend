@@ -100,7 +100,7 @@ def validate_line(tile1: Tile, tile2: Tile):
     
     
 def validate_inverse_diagonal(tile1: Tile, tile2: Tile):
-    if abs(tile1.rowIndex - tile2.rowIndex) == 2 and abs(tile1.columnIndex - tile2.columnIndex) == 1:
+    if abs(tile1.rowIndex - tile2.rowIndex) == 1 and abs(tile1.columnIndex - tile2.columnIndex) == 1:
         return True
     
     return False
@@ -138,10 +138,10 @@ def validate_l(tile1: Tile, tile2: Tile):
     return False
 
 def validate_line_border(tile1: Tile, tile2: Tile):
-    if tile1.rowIndex == tile2.rowIndex and abs(tile1.columnIndex - tile2.columnIndex) == 3:
+    if tile1.rowIndex == tile2.rowIndex and (tile1.columnIndex == 0 or tile1.columnIndex == 5 or tile2.columnIndex == 0 or tile2.columnIndex == 5):
         return True
     
-    if tile1.columnIndex == tile2.columnIndex and abs(tile1.rowIndex - tile2.rowIndex) == 3:
+    if tile1.columnIndex == tile2.columnIndex and (tile1.rowIndex == 0 or tile1.rowIndex == 5 or tile2.rowIndex == 0 or tile2.rowIndex == 5):
         return True
     
     return False

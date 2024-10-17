@@ -29,7 +29,7 @@ async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     match_service.update_match(match_id, "FINISHED", 0)
     reason_winning = reason.value
     
-    msg = {"key": "WINNER", "payload": {"player_id": player_id, "Reason": reason_winning}}
+    msg = {"key": "WINNER", "payload": {"player_id": player_id, "reason": reason_winning}}
     
     try:
         await manager.broadcast_to_game(match_id, msg)
@@ -132,7 +132,7 @@ def validate_partial_move(partialMove: PartialMove):
     if len(partialMove.tiles) != 2:
         raise HTTPException(status_code=400, detail="Partial move must have 2 tiles")
     
-    if partialMove.movement_card not in enums.Movements.__members__: 
+    if partialMove.movement_card not in enums.Movements.value2member_map:
         raise HTTPException(status_code=400, detail="Movement card not valid")
     
     tile1 = partialMove.tiles[0]
@@ -148,19 +148,19 @@ def validate_partial_move(partialMove: PartialMove):
     #path = "validate_" + movement_card.lower()
     #path(tile1, tile2)
     
-    if movement_card == "DIAGONAL":
+    if movement_card == "Diagonal":
         return validate_diagonal(tile1, tile2)
-    elif movement_card == "INVERSE_DIAGONAL":
+    elif movement_card == "Inverse Diagonal":
         return validate_inverse_diagonal(tile1, tile2)
-    elif movement_card == "LINE":
+    elif movement_card == "Line":
         return validate_line(tile1, tile2)
-    elif movement_card == "LINE_BETWEEN":
+    elif movement_card == "Line Between":
         return validate_line_between(tile1, tile2)
     elif movement_card == "L":
         return validate_l(tile1, tile2)
-    elif movement_card == "INVERSE_L":
+    elif movement_card == "Inverse L":
         return validate_inverse_l(tile1, tile2)
-    elif movement_card == "LINE_BORDER":
+    elif movement_card == "Line Border":
         return validate_line_border(tile1, tile2)
     else:
         raise HTTPException(status_code=400, detail="Movement card not valid")
@@ -204,8 +204,13 @@ def partial_move(match_id: int, player_id: int, partialMove: PartialMove, db: Se
             
             board_service.update_list_of_parcial_movements(board.id, [tile1, tile2])
             board_service.print_temporary_movements(board.id)
+            board_table = board_service.get_board_table(board.id)
+            msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"board": board_table}}
+            manager.broadcast_to_game(match_id, msg)
+        
         else:
             raise HTTPException(status_code=400, detail="Invalid movement")
+        
     
     except HTTPException as e:
         raise e
