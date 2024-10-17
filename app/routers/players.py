@@ -189,7 +189,7 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             tile_service = TileService(db)
             board_service = BoardService(db)
             
-            board = board_service.get_board_by_id(match_id)
+            board = board_service.get_board_by_match_id(match_id)
             tile1 = tile_service.get_tile_by_position(partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex, board.id)
             tile2 = tile_service.get_tile_by_position(partialMove.tiles[1].rowIndex, partialMove.tiles[1].columnIndex, board.id)
             print("tile 1 antes", partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex)
@@ -207,7 +207,7 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             board_table = board_service.get_board_table(board.id)
             msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"board": board_table}}
             await manager.broadcast_to_game(match_id, msg)
-        
+            
         else:
             raise HTTPException(status_code=400, detail="Invalid movement")
         
