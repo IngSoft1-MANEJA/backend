@@ -24,7 +24,7 @@ async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     match_service.update_match(match_id, "FINISHED", 0)
     reason_winning = reason.value
     
-    msg = {"key": "WINNER", "payload": {"player_id": player_id, "Reason": reason_winning}}
+    msg = {"key": "WINNER", "payload": {"player_id": player_id, "reason": reason_winning}}
     
     try:
         await manager.broadcast_to_game(match_id, msg)
