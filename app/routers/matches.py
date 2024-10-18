@@ -178,7 +178,7 @@ async def notify_all_players_movements_received(player: Players, match: Matches)
         if player_i.id != player.id:
             msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
                         "payload": {"player": player.player_name}}
-            await manager.send_to_player(match.id, msg_all)
+            await manager.send_to_player(match.id, player_i.id, msg_all)
 
 
 async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):

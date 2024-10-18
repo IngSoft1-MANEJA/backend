@@ -37,4 +37,4 @@ class Tile(BaseModel):
 
 class PartialMove(BaseModel):
     tiles: List[Tile]
-    movement_card: str
+    movement_card: int

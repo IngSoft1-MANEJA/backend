@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy import select
 
+from app.cruds.movement_card import MovementCardService
 from app.exceptions import *
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
@@ -83,8 +84,8 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
         # Si el jugador se quiere salir en su turno, debo pasar el turno al siguiente y luego avisar
         if player_to_delete.turn_order == match_to_leave.current_player_turn:
-            next_player = end_turn_logic(player_to_delete, match_to_leave, db)
             
+            next_player = end_turn_logic(player_to_delete, match_to_leave, db)
             msg= {
                 "key": "END_PLAYER_TURN", 
                 "payload": {
@@ -116,8 +117,9 @@ def end_turn_logic(player: Players, match:Matches, db: Session):
     if player.turn_order != match.current_player_turn:
         raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
     
-    if match.current_player_turn == match.current_players:
-        match_service.update_turn(match.id, turn=1)
+    if match.current_player_turn == match.max_players:
+        print("current player", match.current_players)
+        match_service.update_turn(match.id, turn=1) 
     else:
         match_service.update_turn(match.id, match.current_player_turn + 1) 
     
@@ -156,16 +158,16 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     await manager.broadcast_to_game(match.id, msg)
     
     
-def validate_partial_move(partialMove: PartialMove):
+def validate_partial_move(partialMove: PartialMove, card_type: str):
     if len(partialMove.tiles) != 2:
         raise HTTPException(status_code=400, detail="Partial move must have 2 tiles")
     
-    if partialMove.movement_card not in enums.Movements._value2member_map_:
+    if card_type not in enums.Movements._value2member_map_:
         raise HTTPException(status_code=400, detail="Movement card not valid")
     
     tile1 = partialMove.tiles[0]
     tile2 = partialMove.tiles[1]
-    movement_card = partialMove.movement_card
+    movement_card = card_type
     
     if (tile1.rowIndex < 0 or tile1.rowIndex >= 6 or
     tile1.columnIndex < 0 or tile1.columnIndex >= 6 or
@@ -211,7 +213,9 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
         raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
     
     try:
-        if validate_partial_move(partialMove):
+        movement_service = MovementCardService(db)
+        card_type = movement_service.get_movement_card_by_id(partialMove.movement_card).mov_type
+        if validate_partial_move(partialMove, card_type):
             tile_service = TileService(db)
             board_service = BoardService(db)
             
@@ -222,16 +226,17 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             aux_tile = copy.copy(tile1)
             tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
             tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
+                
+            board_service.update_list_of_parcial_movements(board.id, [tile1, tile2]) 
+            movement_service.update_card_owner_to_none(partialMove.movement_card)
             
-            board_service.update_list_of_parcial_movements(board.id, [tile1, tile2])
-            board_table = board_service.get_board_table(board.id)
-            msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"board": board_table}}
+            tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+            msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": tiles}}
             await manager.broadcast_to_game(match_id, msg)
             
         else:
             raise HTTPException(status_code=400, detail="Invalid movement")
         
-    
     except HTTPException as e:
         raise e
     

@@ -161,3 +161,19 @@ class MovementCardService:
             MovementCards.match_id == match_id, 
             MovementCards.player_owner == None).all()
         return movement_cards
+    
+    def update_card_owner_to_none(self, movement_card_id: int):
+        """
+        Actualiza el propietario de una carta de movimiento.
+
+        Args:
+            - movement_card_id : Id de la carta de movimiento.
+            - player_id : Id del nuevo propietario.
+        Returns:
+            none.
+        """
+        movement_card = self.get_movement_card_by_id(movement_card_id)
+        movement_card.player_owner = None
+        self.db.commit()
+        self.db.refresh(movement_card)
+        return movement_card
