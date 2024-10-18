@@ -1,16 +1,23 @@
+import copy
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy import select
 
+from app.cruds.movement_card import MovementCardService
 from app.exceptions import *
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
+from app.cruds.tile import TileService
+from app.cruds.board import BoardService
 from app.connection_manager import manager
 from app.database import get_db
+from app.models import enums
 from app.models.enums import ReasonWinning
 from app.models.models import Players, Matches
 from app.routers.matches import give_movement_card_to_player, give_shape_card_to_player, notify_all_players_movements_received, notify_movement_card_to_player
+from app.schemas import PartialMove
+from app.utils.utils import validate_diagonal, validate_inverse_diagonal, validate_line, validate_line_between, validate_inverse_l, validate_l, validate_line_border
 
 router = APIRouter(prefix="/matches")
 
@@ -31,6 +38,7 @@ async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     except RuntimeError as e:
         # Manejar el caso en que el WebSocket ya esté cerrado
         print(f"Error al enviar mensaje: {e}")
+        
 
 @router.delete("/{match_id}/left/{player_id}")
 async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
@@ -76,8 +84,8 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
         # Si el jugador se quiere salir en su turno, debo pasar el turno al siguiente y luego avisar
         if player_to_delete.turn_order == match_to_leave.current_player_turn:
-            next_player = end_turn_logic(player_to_delete, match_to_leave, db)
             
+            next_player = end_turn_logic(player_to_delete, match_to_leave, db)
             msg= {
                 "key": "END_PLAYER_TURN", 
                 "payload": {
@@ -95,7 +103,7 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
     except PlayerNotConnected as e:
         raise HTTPException(
-            status_code=404, detail="Player not connected to match")
+            status_code=404, detail="Player not connected to match")    
     except GameConnectionDoesNotExist as e:
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
@@ -131,15 +139,10 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail=f"Match not found")
     
     next_player = end_turn_logic(player, match, db)
-    
-    print(f"Calling give_movement_card_to_player with player_id: {player_id}")
     movs = give_movement_card_to_player(player_id, db)
-    print(f"Movements: {movs}")
     
     await notify_movement_card_to_player(player_id, match_id, movs)
-    print("Notified movements")
     await notify_all_players_movements_received(player, match)
-    print("Notified all players movements received")
     await give_shape_card_to_player(player.id, db, is_init=False)
     
     msg = {
@@ -150,5 +153,128 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
             "next_player_turn": next_player.turn_order
         }
     }
-    await manager.broadcast_to_game(match_id, msg)
+    await manager.broadcast_to_game(match.id, msg)
     
+    
+def validate_partial_move(partialMove: PartialMove, card_type: str):
+    if len(partialMove.tiles) != 2:
+        raise HTTPException(status_code=400, detail="Partial move must have 2 tiles")
+    
+    if card_type not in enums.Movements._value2member_map_:
+        raise HTTPException(status_code=400, detail="Movement card not valid")
+    
+    tile1 = partialMove.tiles[0]
+    tile2 = partialMove.tiles[1]
+    movement_card = card_type
+    
+    if (tile1.rowIndex < 0 or tile1.rowIndex >= 6 or
+    tile1.columnIndex < 0 or tile1.columnIndex >= 6 or
+    tile2.rowIndex < 0 or tile2.rowIndex >= 6 or
+    tile2.columnIndex < 0 or tile2.columnIndex >= 6):
+        raise HTTPException(status_code=400, detail="Tile position is invalid")
+    
+
+    if movement_card == "Diagonal":
+        return validate_diagonal(tile1, tile2)
+    elif movement_card == "Inverse Diagonal":
+        return validate_inverse_diagonal(tile1, tile2)
+    elif movement_card == "Line":
+        return validate_line(tile1, tile2)
+    elif movement_card == "Line Between":
+        return validate_line_between(tile1, tile2)
+    elif movement_card == "L":
+        return validate_l(tile1, tile2)
+    elif movement_card == "Inverse L":
+        return validate_inverse_l(tile1, tile2)
+    elif movement_card == "Line Border":
+        return validate_line_border(tile1, tile2)
+    else:
+        raise HTTPException(status_code=400, detail="Movement card not valid")
+
+    
+@router.post("/{match_id}/partial-move/{player_id}", status_code=200)
+async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+    
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    try:
+        player = player_service.get_player_by_id(player_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    if player.turn_order != match.current_player_turn:
+        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
+    
+    try:
+        movement_service = MovementCardService(db)
+        card_type = movement_service.get_movement_card_by_id(partialMove.movement_card).mov_type
+        if validate_partial_move(partialMove, card_type):
+            tile_service = TileService(db)
+            board_service = BoardService(db)
+            
+            board = board_service.get_board_by_match_id(match_id)
+            tile1 = tile_service.get_tile_by_position(partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex, board.id)
+            tile2 = tile_service.get_tile_by_position(partialMove.tiles[1].rowIndex, partialMove.tiles[1].columnIndex, board.id)
+
+            aux_tile = copy.copy(tile1)
+            tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
+            tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
+                
+            board_service.update_list_of_parcial_movements(board.id, [tile1, tile2], partialMove.movement_card) 
+            movement_service.update_card_owner_to_none(partialMove.movement_card)
+            board_service.print_temporary_movements(board.id)
+            
+            tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+            msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": tiles}}
+            await manager.broadcast_to_game(match_id, msg)
+            
+            
+        else:
+            raise HTTPException(status_code=400, detail="Invalid movement")
+        
+    except HTTPException as e:
+        raise e
+    
+
+@router.delete("/{match_id}/partial-move/{player_id}", status_code=200)
+def delete_partial_move(match_id: int, player_id: int, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+    
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    try:
+        player = player_service.get_player_by_id(player_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    if player.turn_order != match.current_player_turn:
+        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
+    
+    try:
+        tile_service = TileService(db)
+        board_service = BoardService(db)
+        
+        board = board_service.get_board_by_id(match_id)
+        last_movement = board_service.get_last_temporary_movements(board.id)
+        tile1 = last_movement.tile1
+        tile2 = last_movement.tile2
+    
+        aux_tile = copy.copy(tile1)
+        tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
+        tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
+        
+        board_service.print_temporary_movements(board.id)
+        
+    except HTTPException as e:
+        raise e
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Tile not found")

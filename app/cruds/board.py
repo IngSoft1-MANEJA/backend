@@ -1,5 +1,6 @@
 from typing import List
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound
 from itertools import cycle
 from random import shuffle
 
@@ -7,7 +8,6 @@ from app.cruds.tile import TileService
 from app.models.enums import Colors
 from app.models.models import Boards, Tiles
 from app.utils.utils import validate_color, validate_turn, validate_board
-
 
 class BoardService:
     """
@@ -123,13 +123,61 @@ class BoardService:
         self.db.delete(board)
         self.db.commit()
 
-    def update_turn(self, board_id: int, current_player: int, next_player_turn: int):
+    def get_board_by_match_id(self, match_id: int) -> Boards:
         """
-        Actualiza el turno de los jugadores.
+        Obtiene un tablero de la base de datos por su id de partida.
+        Args:
+            match_id: Id de la partida.
+        Returns:
+            board: Tablero.
+        """
+        try:
+            board = self.db.query(Boards).filter(Boards.match_id == match_id).one()
+            return board
+        
+        except NoResultFound:
+            raise NoResultFound("Board not found with match_id {match_id}") 
+    
+    def update_list_of_parcial_movements(self, board_id: int, list_of_parcial_movements: List[Tiles], id_mov: int):
+        """
+        Actualiza la lista de movimientos parciales de un tablero.
+        Args:
+            board_id: Id del tablero.
+            list_of_parcial_movements: Lista de movimientos parciales.
+        """
+        try:
+            board = self.db.query(Boards).filter(Boards.id == board_id).one()
+            board.add_temporary_movement(list_of_parcial_movements[0], list_of_parcial_movements[1], id_mov) 
+            self.db.commit()
+            
+        except NoResultFound:
+            raise NoResultFound("Board not found with id {board_id}")
+        
+    def print_temporary_movements(self, board_id: int):
+        """
+        Obtiene la lista de movimientos temporales de un tablero.
+        Args:
+            board_id: Id del tablero.
+        Returns:
+            list_of_parcial_movements: Lista de movimientos temporales.
+        """
+        try:
+            board = self.db.query(Boards).filter(Boards.id == board_id).one()
+            board.print_temporary_movements()
+        
+        except NoResultFound:
+            raise NoResultFound("Board not found with id {board_id}")
+        
+    def get_last_temporary_movements(self, board_id: int):
+        """
+        Elimina la lista de movimientos temporales de un tablero.
         Args:
             board_id: Id del tablero.
         """
-        validate_turn(current_player, next_player_turn, board_id)
-        board = self.db.query(Boards).filter(Boards.id == board_id).one()
-        board.current_player = board.next_player_turn
-        self.db.commit()
+        try:
+            board = self.db.query(Boards).filter(Boards.id == board_id).one()
+            movement = board.get_last_movement()
+            return movement
+        
+        except NoResultFound:
+            raise NoResultFound("Board not found with id {board_id}")

@@ -1,6 +1,7 @@
 import re
 import app.exceptions as e
 from app.models.enums import *
+from app.schemas import Tile
 INVALID_CHARACTERS = set("!@#$%^&*()+=[]{}|\\;:'\",<>/?`~")
 
 # Definir rango válido para el número máximo de jugadores
@@ -70,3 +71,77 @@ def validate_turn(current_player: int, next_player_turn: int, board_id: int):
 def validate_board(board_id: int):
     if not board_id:
         raise e.BoardNotFound(board_id)
+    
+    
+def validate_diagonal(tile1: Tile , tile2: Tile):
+    if abs(tile1.rowIndex - tile2.rowIndex) == 2 and abs(tile1.columnIndex - tile2.columnIndex) == 2:
+        return True
+    return False
+    
+    
+def validate_line_between(tile1: Tile, tile2: Tile):
+    if tile1.rowIndex == tile2.rowIndex and abs(tile1.columnIndex - tile2.columnIndex) == 2:
+        return True
+    
+    if tile1.columnIndex == tile2.columnIndex and abs(tile1.rowIndex - tile2.rowIndex) == 2:
+        return True
+    
+    return False
+    
+    
+def validate_line(tile1: Tile, tile2: Tile):
+    if tile1.rowIndex == tile2.rowIndex and abs(tile1.columnIndex - tile2.columnIndex) == 1:
+        return True
+    
+    if tile1.columnIndex == tile2.columnIndex and abs(tile1.rowIndex - tile2.rowIndex) == 1:
+        return True
+    
+    return False
+    
+    
+def validate_inverse_diagonal(tile1: Tile, tile2: Tile):
+    if abs(tile1.rowIndex - tile2.rowIndex) == 1 and abs(tile1.columnIndex - tile2.columnIndex) == 1:
+        return True
+    
+    return False
+
+
+def validate_inverse_l(tile1: Tile, tile2: Tile):
+    if tile1.rowIndex == tile2.rowIndex + 2 and tile1.columnIndex == tile2.columnIndex - 1:
+        return True
+    
+    if tile1.rowIndex == tile2.rowIndex - 1 and tile1.columnIndex == tile2.columnIndex - 2:
+        return True
+    
+    if tile1.rowIndex == tile2.rowIndex - 2 and tile1.columnIndex == tile2.columnIndex + 1:
+        return True 
+    
+    if tile1.rowIndex == tile2.rowIndex + 1 and tile1.columnIndex == tile2.columnIndex + 2:
+        return True
+    
+    return False
+   
+   
+def validate_l(tile1: Tile, tile2: Tile):
+    if tile1.rowIndex == tile2.rowIndex + 2 and tile1.columnIndex == tile2.columnIndex + 1:
+        return True
+    
+    if tile1.rowIndex == tile2.rowIndex + 1 and tile1.columnIndex == tile2.columnIndex - 2:
+        return True
+    
+    if tile1.rowIndex == tile2.rowIndex - 2 and tile1.columnIndex == tile2.columnIndex - 1:
+        return True 
+    
+    if tile1.rowIndex == tile2.rowIndex - 1 and tile1.columnIndex == tile2.columnIndex + 2:
+        return True
+    
+    return False
+
+def validate_line_border(tile1: Tile, tile2: Tile):
+    if tile1.rowIndex == tile2.rowIndex and (tile1.columnIndex == 0 or tile1.columnIndex == 5 or tile2.columnIndex == 0 or tile2.columnIndex == 5):
+        return True
+    
+    if tile1.columnIndex == tile2.columnIndex and (tile1.rowIndex == 0 or tile1.rowIndex == 5 or tile2.rowIndex == 0 or tile2.rowIndex == 5):
+        return True
+    
+    return False
