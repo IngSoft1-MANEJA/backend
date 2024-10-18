@@ -139,14 +139,10 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     
     next_player = end_turn_logic(player, match, db)
     
-    print(f"Calling give_movement_card_to_player with player_id: {player_id}")
     movs = give_movement_card_to_player(player_id, db)
-    print(f"Movements: {movs}")
     
     await notify_movement_card_to_player(player_id, match_id, movs)
-    print("Notified movements")
     await notify_all_players_movements_received(player, match)
-    print("Notified all players movements received")
     await give_shape_card_to_player(player.id, db, is_init=False)
     
     msg = {
@@ -177,9 +173,7 @@ def validate_partial_move(partialMove: PartialMove):
     tile2.columnIndex < 0 or tile2.columnIndex >= 6):
         raise HTTPException(status_code=400, detail="Tile position is invalid")
     
-    #path = "validate_" + movement_card.lower()
-    #path(tile1, tile2)
-    
+
     if movement_card == "Diagonal":
         return validate_diagonal(tile1, tile2)
     elif movement_card == "Inverse Diagonal":
@@ -224,18 +218,12 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             board = board_service.get_board_by_match_id(match_id)
             tile1 = tile_service.get_tile_by_position(partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex, board.id)
             tile2 = tile_service.get_tile_by_position(partialMove.tiles[1].rowIndex, partialMove.tiles[1].columnIndex, board.id)
-            print("tile 1 antes", partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex)
-            print("tile 1", tile1)
-
-            print("tile 2 antes", partialMove.tiles[1].rowIndex, partialMove.tiles[1].columnIndex)
-            print("tile 2", tile2)
 
             aux_tile = copy.copy(tile1)
             tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
             tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
             
             board_service.update_list_of_parcial_movements(board.id, [tile1, tile2])
-            board_service.print_temporary_movements(board.id)
             board_table = board_service.get_board_table(board.id)
             msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"board": board_table}}
             await manager.broadcast_to_game(match_id, msg)

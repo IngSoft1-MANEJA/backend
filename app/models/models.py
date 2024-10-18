@@ -152,9 +152,7 @@ class Boards(Base):
         self.temporary_movements.append(movement)
 
     def get_last_movement(self):
-        print("no entre")
         if len(self.temporary_movements) > 0:
-            print("entre")
             last_movement = self.temporary_movements.pop()
             return last_movement
             

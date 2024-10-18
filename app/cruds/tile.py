@@ -92,7 +92,6 @@ class TileService:
             tile: Ficha.
         """
         try:
-            print(position_x, position_y, board_id)
             tile = self.db.query(Tiles).filter(Tiles.position_x == position_x, Tiles.position_y == position_y, Tiles.board_id == board_id).one()
             return tile
         except NoResultFound:
