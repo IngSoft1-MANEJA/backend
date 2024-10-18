@@ -134,6 +134,24 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
+    
+
+def end_turn_logic(player: Players, match:Matches, db: Session):
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+    
+    if player.turn_order != match.current_player_turn:
+        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
+    
+    if match.current_player_turn == match.current_players:
+        match_service.update_turn(match.id, turn=1)
+    else:
+        match_service.update_turn(match.id, match.current_player_turn + 1) 
+    
+    next_player = player_service.get_player_by_turn(turn_order= match.current_player_turn, match_id= match.id)
+    
+    return next_player
+
 
 @router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
 async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
