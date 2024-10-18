@@ -157,7 +157,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
             "next_player_turn": next_player.turn_order
         }
     }
-    await manager.broadcast_to_game(match_id, msg)
+    await manager.broadcast_to_game(match.id, msg)
     
     
 def validate_partial_move(partialMove: PartialMove):
