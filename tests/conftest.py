@@ -109,6 +109,13 @@ def board_service(db_session):
 def tile_service(db_session):
     return TileService(db_session)
 
+@pytest.fixture
+def player():
+    return Players(id=1, player_name="Player 1", match_id=1, turn_order=1, is_owner=True)
+
+@pytest.fixture
+def match():
+    return Matches(id=1, state="STARTED", current_players=2, current_player_turn=1)
 
 @pytest.fixture()
 def load_matches(db_session):
