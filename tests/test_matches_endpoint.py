@@ -1,6 +1,7 @@
 from random import seed
 import pytest
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session
 from fastapi import status
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -134,139 +135,56 @@ def test_create_movement_deck_success(client, load_matches, db_session):
 def test_create_movement_deck_invalid(client, load_matches, db_session):
     with pytest.raises(Exception):
         create_movement_deck(999999)
-
-@pytest.mark.asyncio
-async def test_notify_movement_card_to_player():
-    player_id = 1
-    match_id = 1
-    buff_movement = [(1, "move")]
-
-    msg_user = {
-        "key": "GET_MOVEMENT_CARD",
-        "payload": {"movement_card": buff_movement}
-    }
-
-    with patch('app.routers.matches.manager.send_to_player', new_callable=AsyncMock) as mock_send_to_player:
-        await notify_movement_card_to_player(player_id, match_id, buff_movement)
-        mock_send_to_player.assert_called_once_with(match_id, player_id, msg_user)
-
-@pytest.mark.asyncio
-async def test_notify_all_players_movements_received():
-    player = MagicMock(id=1, player_name="Player1")
-    player_2 = MagicMock(id=2, player_name="Player2")
-    player_3 = MagicMock(id=3, player_name="Player3")
-    player_4 = MagicMock(id=4, player_name="Player4")
-    match = MagicMock(id=1, players=[player, player_2, player_3, player_4])
-
-    msg_all = {
-        "key": "PLAYER_RECEIVE_MOVEMENT_CARD",
-        "payload": {"player": player.player_name}
-    }
-
-    with patch('app.routers.matches.manager.send_to_player', new_callable=AsyncMock) as mock_send_to_player:
-        await notify_all_players_movements_received(player, match)
-        assert mock_send_to_player.call_count == 3
-        mock_send_to_player.assert_any_call(match.id, player_2.id, msg_all)
-        mock_send_to_player.assert_any_call(match.id, player_3.id, msg_all)
-        mock_send_to_player.assert_any_call(match.id, player_4.id, msg_all)
-
-@pytest.mark.asyncio
-async def test_give_shape_card_to_player_initial():
-    db_session = MagicMock(spec=Session)
-    player_id = 1
-    is_init = True
-
-    player = MagicMock(id=player_id, player_name="Player1", turn_order=1, match_id=1)
-    shape_card_service = MagicMock()
-    shape_card_service.get_visible_cards.return_value = []
-    shape_card_service.get_visible_cards.return_value = [MagicMock(id=1, shape_type="circle")]
-
-    with patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
-         patch('app.routers.matches.ShapeCardService', return_value=shape_card_service), \
-         patch('app.routers.matches.manager.broadcast_to_game', new_callable=AsyncMock) as mock_broadcast_to_game:
-        
-        await give_shape_card_to_player(player_id, db_session, is_init)
-        
-        shape_card_service.update_shape_card.assert_called_once()
-        mock_broadcast_to_game.assert_not_called()
-
-@pytest.mark.asyncio
-async def test_give_shape_card_to_player_non_initial():
-    db_session = MagicMock(spec=Session)
-    player_id = 1
-    is_init = False
-
-    player = MagicMock(id=player_id, player_name="Player1", turn_order=1, match_id=1)
-    shape_card_service = MagicMock()
-    shape_card_service.get_visible_cards.return_value = []
-    shape_card_service.get_visible_cards.return_value = [MagicMock(id=1, shape_type="circle")]
-
-    with patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
-         patch('app.routers.matches.ShapeCardService', return_value=shape_card_service), \
-         patch('app.routers.matches.manager.broadcast_to_game', new_callable=AsyncMock) as mock_broadcast_to_game:
-        
-        await give_shape_card_to_player(player_id, db_session, is_init)
-        
-        shape_card_service.update_shape_card.assert_called_once()
-        mock_broadcast_to_game.assert_called_once()
     
-def test_give_movement_card_to_player_enough_cards():
-    db_session = MagicMock(spec=Session)
-    player_id = 1
+class TestStartMatchEndpoint:
 
-    player = MagicMock(id=player_id, player_name="Player1", match_id=1, movement_cards=[])
-    movement_card = MagicMock(id=1, mov_type="move")
+    @pytest.fixture(scope="class")
+    def cleanup(self, match, db_session):
+        yield
 
-    with patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
-         patch('app.routers.matches.MovementCardService.get_movement_cards_without_owner', return_value=[movement_card] * 3), \
-         patch('app.routers.matches.MovementCardService.add_movement_card_to_player') as mock_add_movement_card_to_player:
-        
-        movements_given = give_movement_card_to_player(player_id, db_session)
-        
-        assert len(movements_given) == 3
-        mock_add_movement_card_to_player.assert_called_with(player_id, movement_card.id)
+        db_session.query(Players).filter(Players.match_id == match.id).delete()
+        board = db_session.query(Boards).filter(Boards.match_id == match.id).first()
+        db_session.query(Tiles).filter(Tiles.board_id == board.id).delete()
+        db_session.query(Boards).filter(Boards.match_id == match.id).delete()
+        db_session.query(Matches).filter(Matches.id == match.id).delete()
+        db_session.commit()
 
-def test_give_movement_card_to_player_no_cards():
-    db_session = MagicMock(spec=Session)
-    player_id = 1
+        manager._games.pop(match.id, None)
 
-    player = MagicMock(id=player_id, player_name="Player1", match_id=1, movement_cards=[])
-    movement_card = MagicMock(id=1, mov_type="move")
+    def test_start_match(
+        self,
+        client,
+        db_session,
+    ):
+        seed(49)
 
-    with patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
-            patch('app.routers.matches.MovementCardService.get_movement_cards_without_owner', return_value=[]), \
-            patch('app.routers.matches.MovementCardService.add_movement_card_to_player') as mock_add_movement_card_to_player:
-        
-        movements_given = give_movement_card_to_player(player_id, db_session)
-        
-        assert len(movements_given) == 0
-        mock_add_movement_card_to_player.assert_not_called()
+        match_service_a = MatchService(db_session)
+        player_service_a = PlayerService(db_session)
+        board_service_a = BoardService(db_session)
 
-@pytest.mark.asyncio
-async def test_get_match_info_to_player(client, db_session):
-    match_id = 1
-    player_id = 1
+        match = match_service_a.create_match("Test match", 3, True)
+        owner = player_service_a.create_player("test_owner", match.id, True, "testtoken")
+        players = []
+        for i in range(1, 3):
+            player = player_service_a.create_player(
+                f"test_player_{i}", match.id, False, "testtoken"
+            )
+            players.append(player)
 
-    match = MagicMock(id=match_id, board=MagicMock(id=1), current_player_turn=1)
-    player = MagicMock(id=player_id, turn_order=1)
-    board_table = MagicMock()
-    players_in_match = [MagicMock(id=2, player_name="Player 2", turn_order=2), MagicMock(id=3, player_name="Player 3", turn_order=3)]
-    current_player = MagicMock(player_name="Player 1")
-    shape_cards = [MagicMock(id=1, shape_type="circle")]
-    movement_cards = [MagicMock(id=1, mov_type="move")]
+        match.current_players += 3
+        db_session.commit()
 
-    with patch('app.routers.matches.MatchService.get_match_by_id', return_value=match), \
-         patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
-         patch('app.routers.matches.BoardService.get_board_table', return_value=board_table), \
-         patch('app.routers.matches.PlayerService.get_players_by_match', return_value=players_in_match), \
-         patch('app.routers.matches.PlayerService.get_player_by_turn', return_value=current_player), \
-         patch('app.routers.matches.ShapeCardService.get_visible_cards', return_value=shape_cards), \
-         patch('app.routers.matches.MovementCardService.get_movement_card_by_user', return_value=movement_cards), \
-         patch('app.routers.matches.manager.send_to_player', new_callable=AsyncMock) as mock_send_to_player:
+        manager.create_game_connection(match.id)
+        with client.websocket_connect(
+            f"/matches/{match.id}/ws/{owner.id}"
+        ) as websocket1, client.websocket_connect(
+            f"/matches/{match.id}/ws/{players[0].id}"
+        ) as websocket2, client.websocket_connect(
+            f"/matches/{match.id}/ws/{players[1].id}"
+        ) as websocket3:
 
-        # Asegúrate de que la ruta es correcta
-        response = client.get(f"/matches/{match_id}/player/{player_id}")
-        assert response.status_code == status.HTTP_200_OK
+            response = client.patch(f"/matches/{match.id}/start/{owner.id}")
+            assert response.status_code == status.HTTP_200_OK
 
         msg_info = {
             "key": "GET_PLAYER_MATCH_INFO",

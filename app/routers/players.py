@@ -117,9 +117,8 @@ def end_turn_logic(player: Players, match:Matches, db: Session):
     if player.turn_order != match.current_player_turn:
         raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
     
-    if match.current_player_turn == match.max_players:
-        print("current player", match.current_players)
-        match_service.update_turn(match.id, turn=1) 
+    if match.current_player_turn == match.current_players:
+        match_service.update_turn(match.id, turn=1)
     else:
         match_service.update_turn(match.id, match.current_player_turn + 1) 
     
@@ -140,7 +139,6 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail=f"Match not found")
     
     next_player = end_turn_logic(player, match, db)
-    
     movs = give_movement_card_to_player(player_id, db)
     
     await notify_movement_card_to_player(player_id, match_id, movs)
