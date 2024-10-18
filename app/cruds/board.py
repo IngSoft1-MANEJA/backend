@@ -138,7 +138,7 @@ class BoardService:
         except NoResultFound:
             raise NoResultFound("Board not found with match_id {match_id}") 
     
-    def update_list_of_parcial_movements(self, board_id: int, list_of_parcial_movements: List[Tiles]):
+    def update_list_of_parcial_movements(self, board_id: int, list_of_parcial_movements: List[Tiles], id_mov: int):
         """
         Actualiza la lista de movimientos parciales de un tablero.
         Args:
@@ -147,7 +147,7 @@ class BoardService:
         """
         try:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
-            board.add_temporary_movement(list_of_parcial_movements[0], list_of_parcial_movements[1]) 
+            board.add_temporary_movement(list_of_parcial_movements[0], list_of_parcial_movements[1], id_mov) 
             self.db.commit()
             
         except NoResultFound:

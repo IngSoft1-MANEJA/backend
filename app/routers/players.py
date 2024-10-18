@@ -227,12 +227,14 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
             tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
                 
-            board_service.update_list_of_parcial_movements(board.id, [tile1, tile2]) 
+            board_service.update_list_of_parcial_movements(board.id, [tile1, tile2], partialMove.movement_card) 
             movement_service.update_card_owner_to_none(partialMove.movement_card)
+            board_service.print_temporary_movements(board.id)
             
             tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
             msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": tiles}}
             await manager.broadcast_to_game(match_id, msg)
+            
             
         else:
             raise HTTPException(status_code=400, detail="Invalid movement")

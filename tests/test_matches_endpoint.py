@@ -166,7 +166,9 @@ async def test_notify_all_players_movements_received():
     with patch('app.routers.matches.manager.send_to_player', new_callable=AsyncMock) as mock_send_to_player:
         await notify_all_players_movements_received(player, match)
         assert mock_send_to_player.call_count == 3
-        mock_send_to_player.assert_any_call(match.id, msg_all)
+        mock_send_to_player.assert_any_call(match.id, player_2.id, msg_all)
+        mock_send_to_player.assert_any_call(match.id, player_3.id, msg_all)
+        mock_send_to_player.assert_any_call(match.id, player_4.id, msg_all)
 
 @pytest.mark.asyncio
 async def test_give_shape_card_to_player_initial():
