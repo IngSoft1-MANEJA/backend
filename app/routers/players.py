@@ -40,6 +40,29 @@ async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
         print(f"Error al enviar mensaje: {e}")
         
 
+def end_turn_logic(player: Players, match: Matches, db: Session):
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+    
+    if player.turn_order != match.current_player_turn:
+        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
+    
+    active_players = player_service.get_players_by_match(match.id)
+    active_players.sort(key=lambda p: p.turn_order) # Ordeno la lista por orden de turnos
+    next_player = None
+    
+    for p in active_players: # For para encontrar el siguiente turno 
+        if p.turn_order > match.current_player_turn:
+            next_player = p
+            break
+    # Si no hay es porque el siguiente jugador es el primero
+    if not next_player:
+        next_player = active_players[0]
+    
+    match_service.update_turn(match.id, next_player.turn_order)
+    
+    return next_player
+
 @router.delete("/{match_id}/left/{player_id}")
 async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
     try:
@@ -63,7 +86,12 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
             if player_to_delete.is_owner:
                 raise HTTPException(status_code=400, detail="Owner cannot leave match")
                 
-        match_to_leave = match_service.get_match_by_id(match_id)
+        # Si el jugador se quiere salir en su turno, obtener el siguiente jugador antes de eliminar
+        if player_to_delete.turn_order == match_to_leave.current_player_turn:
+            next_player = end_turn_logic(player_to_delete, match_to_leave, db)
+        else:
+            next_player = None
+        
         player_service.delete_player(player_id)
 
         try:
@@ -82,10 +110,8 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
             # Manejar el caso en que el WebSocket ya esté cerrado
             print(f"Error al enviar mensaje: {e}")
 
-        # Si el jugador se quiere salir en su turno, debo pasar el turno al siguiente y luego avisar
-        if player_to_delete.turn_order == match_to_leave.current_player_turn:
-            
-            next_player = end_turn_logic(player_to_delete, match_to_leave, db)
+        # Notificar a los jugadores sobre el cambio de turno si el jugador que se salió era el dueño del turno
+        if next_player:
             msg= {
                 "key": "END_PLAYER_TURN", 
                 "payload": {
@@ -108,23 +134,34 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
-    
 
-def end_turn_logic(player: Players, match:Matches, db: Session):
-    match_service = MatchService(db)
-    player_service = PlayerService(db)
+@router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
+async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
+    try:
+        player = PlayerService(db).get_player_by_id(player_id)
+    except:
+        raise HTTPException(status_code=404, detail=f"Player not found")
+    try:
+        match = MatchService(db).get_match_by_id(match_id)
+    except:
+        raise HTTPException(status_code=404, detail=f"Match not found")
     
-    if player.turn_order != match.current_player_turn:
-        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
+    next_player = end_turn_logic(player, match, db)
+    movs = give_movement_card_to_player(player_id, db)
     
-    if match.current_player_turn == match.current_players:
-        match_service.update_turn(match.id, turn=1)
-    else:
-        match_service.update_turn(match.id, match.current_player_turn + 1) 
+    await notify_movement_card_to_player(player_id, match_id, movs)
+    await notify_all_players_movements_received(player, match)
+    await give_shape_card_to_player(player.id, db, is_init=False)
     
-    next_player = player_service.get_player_by_turn(turn_order= match.current_player_turn, match_id= match.id)
-    
-    return next_player
+    msg = {
+        "key": "END_PLAYER_TURN", 
+        "payload": {
+            "current_player_name": player.player_name,
+            "next_player_name": next_player.player_name,
+            "next_player_turn": next_player.turn_order
+        }
+    }
+    await manager.broadcast_to_game(match.id, msg)
 
 
 @router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
