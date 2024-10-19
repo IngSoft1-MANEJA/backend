@@ -257,7 +257,7 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
     
 
 @router.delete("/{match_id}/partial-move/{player_id}", status_code=200)
-def delete_partial_move(match_id: int, player_id: int, db: Session = Depends(get_db)):
+async def delete_partial_move(match_id: int, player_id: int, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
     
@@ -293,3 +293,19 @@ def delete_partial_move(match_id: int, player_id: int, db: Session = Depends(get
         raise e
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
+
+    # Send Info about figures coordinates
+    board_figures = None
+    try:
+        match = MatchService(db).get_match_by_id(match_id)
+        board_figures = BoardService(db).get_formed_figures(match.board.id)
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Error with formed figures")
+
+    msg = {
+        "key": "ALLOW_FIGURES",
+        "payload": board_figures
+    }
+
+    await manager.broadcast_to_game(match_id, msg)

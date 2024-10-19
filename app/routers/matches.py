@@ -315,7 +315,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
     }
     await manager.send_to_player(match_id, player_id, msg_info)
 
-    # Se le envian las cartas de movimiento y figuras=
+    # Se le envian las cartas de movimiento y figuras
     s_service = ShapeCardService(db)
     m_service = MovementCardService(db)
 
@@ -353,15 +353,3 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
     }
 
     await manager.send_to_player(match_id, player_id, msg)
-
-
-@router.get("/{match_id}/board/")
-async def get_board(match_id: int, db: Session = Depends(get_db)):
-    try:
-        match = MatchService(db).get_match_by_id(match_id)
-        board_figures = BoardService(db).get_formed_figures(match.board.id)
-    except Exception as e:
-        logger.error(e)
-        raise HTTPException(
-            status_code=500, detail="Error with formed figures")
-    return board_figures
