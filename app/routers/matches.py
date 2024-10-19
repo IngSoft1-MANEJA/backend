@@ -353,4 +353,4 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
         "payload": board_figures
     }
 
-    await manager.broadcast_to_game(match_id, msg)
+    await manager.send_to_player(match_id, player_id, msg)
