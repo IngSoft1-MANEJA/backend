@@ -22,7 +22,9 @@ class Board:
     def __getitem__(self, i: int):
         return self._matrix[i]
 
+
 Coordinate = collections.namedtuple("Coordinate", ["x", "y"])
+
 
 class Figure:
     def __init__(self, coordinates: tuple[Coordinate, ...]) -> None:
@@ -35,7 +37,7 @@ class Figure:
         if not isinstance(other, Figure):
             raise NotImplementedError
         return self.coordinates == other.coordinates
-    
+
     def __lt__(self, other: object) -> bool:
         if not isinstance(other, Figure):
             raise NotImplementedError
@@ -120,7 +122,8 @@ def get_all_board_shapes(board: Board) -> typing.Iterator[Shape]:
     Yields:
         shape formed from adjacent tiles of the same Colors.
     """
-    visited = [[False for _ in range(board.shape[1])] for _ in range(board.shape[0])]
+    visited = [[False for _ in range(board.shape[1])]
+               for _ in range(board.shape[0])]
     for i in range(board.shape[0]):
         for j in range(board.shape[1]):
             Colors = board[i][j]

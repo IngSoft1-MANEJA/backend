@@ -13,6 +13,7 @@ from app.logger import logging
 
 logger = logging.getLogger(__name__)
 
+
 class BoardService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Boards
@@ -23,7 +24,7 @@ class BoardService:
             db: La session de la base de datos."""
         self.db = db
 
-    def create_board(self, match_id : int, ban_color : str = None):
+    def create_board(self, match_id: int, ban_color: str = None):
         """
         Crea un nuevo tablero en la base de datos.
         Args:
@@ -77,7 +78,7 @@ class BoardService:
             .all()
         )
         board = [
-            [tile.color for tile in tiles[i * 6 : (i + 1) * 6]]
+            [tile.color for tile in tiles[i * 6: (i + 1) * 6]]
             for i in range(6)
         ]
         return board
@@ -136,12 +137,13 @@ class BoardService:
             board: Tablero.
         """
         try:
-            board = self.db.query(Boards).filter(Boards.match_id == match_id).one()
+            board = self.db.query(Boards).filter(
+                Boards.match_id == match_id).one()
             return board
-        
+
         except NoResultFound:
-            raise NoResultFound("Board not found with match_id {match_id}") 
-    
+            raise NoResultFound("Board not found with match_id {match_id}")
+
     def update_list_of_parcial_movements(self, board_id: int, list_of_parcial_movements: List[Tiles], id_mov: int):
         """
         Actualiza la lista de movimientos parciales de un tablero.
@@ -151,12 +153,13 @@ class BoardService:
         """
         try:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
-            board.add_temporary_movement(list_of_parcial_movements[0], list_of_parcial_movements[1], id_mov) 
+            board.add_temporary_movement(
+                list_of_parcial_movements[0], list_of_parcial_movements[1], id_mov)
             self.db.commit()
-            
+
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")
-        
+
     def print_temporary_movements(self, board_id: int):
         """
         Obtiene la lista de movimientos temporales de un tablero.
@@ -168,10 +171,10 @@ class BoardService:
         try:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
             board.print_temporary_movements()
-        
+
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")
-        
+
     def get_last_temporary_movements(self, board_id: int):
         """
         Elimina la lista de movimientos temporales de un tablero.
@@ -182,14 +185,14 @@ class BoardService:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
             movement = board.get_last_movement()
             return movement
-        
+
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")
-        
+
     def get_formed_figures(self, board_id: int) -> List[Figure]:
         figures_to_find = frozenset(
             list(map(lambda x: Figure(x), FIGURE_COORDINATES.values())))
-        
+
         board_table = self.get_board_table(board_id)
         board_figures = find_board_figures(Board(board_table), figures_to_find)
 
