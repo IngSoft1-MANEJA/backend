@@ -7,8 +7,8 @@ from random import shuffle
 from app.cruds.tile import TileService
 from app.models.enums import Colors
 from app.models.models import Boards, Tiles
-from app.utils.board_shapes_algorithm import Board, Figure, find_board_figures
-from app.utils.utils import FIGURE_COORDINATES, validate_color, validate_turn, validate_board
+from app.utils.board_shapes_algorithm import *
+from app.utils.utils import FIGURE_COORDINATES, validate_color, validate_turn, validate_board, ALL_FIGURES
 from app.logger import logging
 
 logger = logging.getLogger(__name__)
@@ -190,11 +190,9 @@ class BoardService:
             raise NoResultFound("Board not found with id {board_id}")
 
     def get_formed_figures(self, board_id: int) -> List[Figure]:
-        figures_to_find = frozenset(
-            list(map(lambda x: Figure(x), FIGURE_COORDINATES.values())))
-
+  
         board_table = self.get_board_table(board_id)
-        board_figures = find_board_figures(Board(board_table), figures_to_find)
+        board_figures = find_board_figures(Board(board_table), ALL_FIGURES)
 
         str_to_log = ""
         for i in board_table:
