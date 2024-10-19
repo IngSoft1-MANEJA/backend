@@ -15,7 +15,10 @@ from app.models.enums import *
 from app.models.models import Matches, Players
 from app.schemas import *
 from app.database import get_db
-from app.utils.utils import MAX_SHAPE_CARDS
+from app.utils.utils import MAX_SHAPE_CARDS, FIGURE_COORDINATES
+from app.logger import logging
+from app.utils.board_shapes_algorithm import Figure, find_board_figures, Board
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches")
 
@@ -115,13 +118,15 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
 
 # ==================================== Auxiliares para el inicio de la partida ====================================
 
+
 def create_movement_deck(db: Session, match_id: int):
     movement_service = MovementCardService(db)
 
     for mov in Movements:  # Por cada tipo de enum
         for _ in range(7):
             movement_service.create_movement_card(mov.value, match_id)
-    
+
+
 def give_movement_card_to_player(player_id: int, db: Session):
     """
     Da hasta 3 cartas de movimiento al jugador.
@@ -151,6 +156,7 @@ def give_movement_card_to_player(player_id: int, db: Session):
 
     return movements_given
 
+
 async def notify_movement_card_to_player(player_id: int, match_id: int, buff_movement: list[tuple[int, str]]):
     """
         Notifica al jugador que se le dio una carta de movimiento.
@@ -165,6 +171,7 @@ async def notify_movement_card_to_player(player_id: int, match_id: int, buff_mov
                 "payload": {"movement_card": buff_movement}}
     await manager.send_to_player(match_id, player_id, msg_user)
 
+
 async def notify_all_players_movements_received(player: Players, match: Matches):
     """
         Notifica a los demás jugadores que un jugador recibió una carta de movimiento.
@@ -177,7 +184,7 @@ async def notify_all_players_movements_received(player: Players, match: Matches)
     for player_i in match.players:
         if player_i.id != player.id:
             msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
-                        "payload": {"player": player.player_name}}
+                       "payload": {"player": player.player_name}}
             await manager.send_to_player(match.id, player_i.id, msg_all)
 
 
@@ -217,7 +224,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
         match = match_service.get_match_by_id(match_id)
         movement_service = MovementCardService(db)
         shape_service = ShapeCardService(db)
-        
+
         if match.current_players < match.max_players or match.state != MatchState.WAITING.value:
             raise HTTPException(status_code=404, detail="Not enough players")
 
@@ -242,18 +249,18 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
             # ============== Creo el tablero y lo configuro ================
             board_service = BoardService(db)
-            board = board_service.create_board(match_id)  
+            board = board_service.create_board(match_id)
             board_service.init_board(board.id)
-            _ = match_service.set_players_order(match) 
+            _ = match_service.set_players_order(match)
 
             for player_i in match.players:
                 msg = {"key": "START_MATCH",
                        "payload": {}}
                 await manager.send_to_player(match_id, player_i.id, msg)
-                
+
                 give_movement_card_to_player(player_i.id, db)
                 await give_shape_card_to_player(player_i.id, db, True)
-                
+
             return {"message": "Match started successfully"}
 
         raise HTTPException(status_code=404, detail="Match not found")
@@ -287,7 +294,8 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
         raise HTTPException(
             status_code=404, detail="Error al obtener informacion de la partida")
 
-    current_player = PlayerService(db).get_player_by_turn(match.current_player_turn, match_id)
+    current_player = PlayerService(db).get_player_by_turn(
+        match.current_player_turn, match_id)
     msg_info = {
         "key": "GET_PLAYER_MATCH_INFO",
         "payload": {
@@ -309,22 +317,53 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
     # Se le envian las cartas de movimiento y figuras=
     s_service = ShapeCardService(db)
     m_service = MovementCardService(db)
-    
-    payload_list = [] 
+
+    payload_list = []
     for player_i in players_in_match:
         shapes_p = s_service.get_visible_cards(player_i.id, True)
         all_shapes = [(shape.id, shape.shape_type) for shape in shapes_p]
-        
-        payload = {"turn_order": player_i.turn_order, "shape_cards": all_shapes}
+
+        payload = {"turn_order": player_i.turn_order,
+                   "shape_cards": all_shapes}
         payload_list.append(payload)
-         
+
     msg_shapes = {
         "key": "PLAYER_RECIEVE_ALL_SHAPES",
         "payload": payload_list
     }
-    
+
     await manager.send_to_player(match_id, player_id, msg_shapes)
 
     movements = m_service.get_movement_card_by_user(player_id)
     all_movements = [(mov.id, mov.mov_type) for mov in movements]
     await notify_movement_card_to_player(player_id, match_id, all_movements)
+
+    # Send Info about figures coordinates
+    figures_to_find = frozenset(
+        list(map(lambda x: Figure(x), FIGURE_COORDINATES.values())))
+    board_figures = None
+    try:
+        match = MatchService(db).get_match_by_id(match_id)
+        board_table = BoardService(db).get_board_table(match.board.id)
+        BoardService(db)
+        board_figures = find_board_figures(Board(board_table), figures_to_find)
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Error with formed figures")
+
+    str_to_log = ""
+    for i in board_table:
+        str_to_log += str(i) + "\n"
+    logger.info("Board: \n" + str_to_log)
+
+    str_to_log = ""
+    for i in board_figures:
+        str_to_log += str(i) + "\n"
+    logger.info("Figures coordinates found: \n" + str_to_log)
+
+    msg = {
+        "key": "ALLOW_FIGURES",
+        "payload": board_figures
+    }
+
+    await manager.send_to_player(match_id, player_id, msg)

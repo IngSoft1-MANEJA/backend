@@ -2,6 +2,8 @@ import re
 import app.exceptions as e
 from app.models.enums import *
 from app.schemas import Tile
+from app.utils.board_shapes_algorithm import Coordinate
+
 INVALID_CHARACTERS = set("!@#$%^&*()+=[]{}|\\;:'\",<>/?`~")
 
 # Definir rango válido para el número máximo de jugadores
@@ -17,7 +19,35 @@ MAX_SHAPE_CARDS = 50
 # Definir colores válidos para el ban
 VALID_COLORS = [color.value for color in Colors]
 VALID_SHAPES = [shape.value for shape in HardShapes] + [shape.value for shape in EasyShapes]
-VALID_MOVEMENTS = Movements._value2member_map_.keys()
+VALID_MOVEMENTS = [mov.value for mov in Movements]
+
+FIGURE_COORDINATES = { # TODO Rotarlas y borrar duplicados
+    "T_90": [Coordinate(3,0), Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,0)],
+    "INVERSE_SNAKE": [Coordinate(4,0), Coordinate(4,1), Coordinate(5,1), Coordinate(5,2), Coordinate(5,3)],
+    "SNAKE": [Coordinate(4,2), Coordinate(4,3), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2)],
+    "STAIRS": [Coordinate(3,0), Coordinate(4,0), Coordinate(4,1), Coordinate(5,1), Coordinate(5,2)],
+    "LINE": [Coordinate(5,0), Coordinate(5,1), Coordinate(5,2), Coordinate(5,3), Coordinate(5,4)],
+    "L": [Coordinate(3,0), Coordinate(4,0), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2)],
+    "INVERSE_L_90": [Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(4,3), Coordinate(5,3)],
+    "L_90": [Coordinate(5,0), Coordinate(5,1), Coordinate(5,2), Coordinate(5,3), Coordinate(4,3)],
+    "TOILET": [Coordinate(3,2), Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,1)],
+    "Z_90": [Coordinate(3,2), Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,0)],
+    "INVERSE_TOILET": [Coordinate(3,0), Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,1)],
+    "S_90": [Coordinate(3,0), Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,2)],
+    "BATON": [Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(4,3), Coordinate(5,2)],
+    "INVERSE_BATON": [Coordinate(4,2), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2), Coordinate(5,3)],
+    "TURTLE": [Coordinate(4,1), Coordinate(4,2), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2)],
+    "U": [Coordinate(4,0), Coordinate(4,2), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2)],
+    "PLUS": [Coordinate(3,1), Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,1)],
+    "DOG": [Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,1), Coordinate(5,2)],
+    "MINI_SNAKE": [Coordinate(4,1), Coordinate(4,2), Coordinate(5,1), Coordinate(5,0)],
+    "SQUARE": [Coordinate(4,0), Coordinate(4,1), Coordinate(5,0), Coordinate(5,1)],
+    "INVERSE_MINI_SNAKE": [Coordinate(4,0), Coordinate(4,1), Coordinate(5,1), Coordinate(5,2)],
+    "TRIANGLE": [Coordinate(4,1), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2)],
+    "INVERSE_MINI_L": [Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,2)],
+    "MINI_LINE": [Coordinate(5,0), Coordinate(5,1), Coordinate(5,2), Coordinate(5,3)],
+    "MINI_L_90": [Coordinate(4,2), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2)],
+}
 
 def validate_match_name(name: str):
     if any(char in INVALID_CHARACTERS for char in name):
