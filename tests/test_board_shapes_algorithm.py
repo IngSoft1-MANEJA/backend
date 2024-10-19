@@ -30,7 +30,31 @@ def test_rotate_270_degrees():
     assert(rotated_shape == Figure((Coordinate(3,1), Coordinate(4,1), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2))))
 
 def test_rotate_90_degrees():
-    assert(True)
+    board_dimensions = (6,6)
+
+    figure = FIGURE_COORDINATES["MINI_LINE"]
+    rotated_figure = rotate_90_degrees(figure, board_dimensions)
+    assert(rotated_figure == Figure((Coordinate(2,0), Coordinate(3,0), Coordinate(4,0), Coordinate(5,0))))
+
+    figure = FIGURE_COORDINATES["T_90"]
+    rotated_figure = rotate_90_degrees(figure, board_dimensions)
+    assert(rotated_figure == Figure((Coordinate(3,0), Coordinate(3,1), Coordinate(3,2), Coordinate(4,1), Coordinate(5,1))))
+
+
+def test_rotate_180_degrees():
+    board_dimensions = (6,6)
+
+    figure = Figure(tuple(FIGURE_COORDINATES["T_90"]))
+    rotated_figure = rotate_180_degrees(figure, board_dimensions)
+    assert(rotated_figure == Figure((Coordinate(3,2), Coordinate(4,0), Coordinate(4,1), Coordinate(4,2), Coordinate(5,2))))
+
+def test_rotate_270_degrees():
+    board_dimensions = (6,6)
+
+    figure = Figure(tuple(FIGURE_COORDINATES["T_90"]))
+    rotated_shape = rotate_270_degrees(figure, board_dimensions)
+    assert(rotated_shape == Figure((Coordinate(3,1), Coordinate(4,1), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2))))
+
 
 def test_is_within_bounds():
     dimensions = (5, 5)
