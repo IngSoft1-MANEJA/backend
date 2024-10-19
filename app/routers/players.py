@@ -137,24 +137,6 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         match_to_leave = match_service.get_match_by_id(match_id)
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
-    
-
-def end_turn_logic(player: Players, match:Matches, db: Session):
-    match_service = MatchService(db)
-    player_service = PlayerService(db)
-    
-    if player.turn_order != match.current_player_turn:
-        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
-    
-    if match.current_player_turn == match.current_players:
-        match_service.update_turn(match.id, turn=1)
-    else:
-        match_service.update_turn(match.id, match.current_player_turn + 1) 
-    
-    next_player = player_service.get_player_by_turn(turn_order= match.current_player_turn, match_id= match.id)
-    
-    return next_player
-
 
     if player_to_delete.match_id != match_id:
         raise HTTPException(status_code=404, detail="Player not in match")
