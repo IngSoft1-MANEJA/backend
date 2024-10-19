@@ -247,8 +247,8 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
                 "payload": board_figures
             }
 
-            await manager.send_to_player(match_id, player_id, msg)
-            
+            await manager.broadcast_to_game(match_id, msg)
+
         else:
             raise HTTPException(status_code=400, detail="Invalid movement")
         
