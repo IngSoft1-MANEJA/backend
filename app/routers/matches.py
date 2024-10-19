@@ -18,6 +18,7 @@ from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS, FIGURE_COORDINATES
 from app.logger import logging
 from app.utils.board_shapes_algorithm import Figure, find_board_figures, Board
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches")
@@ -339,27 +340,13 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
     await notify_movement_card_to_player(player_id, match_id, all_movements)
 
     # Send Info about figures coordinates
-    figures_to_find = frozenset(
-        list(map(lambda x: Figure(x), FIGURE_COORDINATES.values())))
     board_figures = None
     try:
         match = MatchService(db).get_match_by_id(match_id)
-        board_table = BoardService(db).get_board_table(match.board.id)
-        BoardService(db)
-        board_figures = find_board_figures(Board(board_table), figures_to_find)
+        board_figures = BoardService(db).get_formed_figures(match.board.id)
     except Exception:
         raise HTTPException(
             status_code=500, detail="Error with formed figures")
-
-    str_to_log = ""
-    for i in board_table:
-        str_to_log += str(i) + "\n"
-    logger.info("Board: \n" + str_to_log)
-
-    str_to_log = ""
-    for i in board_figures:
-        str_to_log += str(i) + "\n"
-    logger.info("Figures coordinates found: \n" + str_to_log)
 
     msg = {
         "key": "ALLOW_FIGURES",
