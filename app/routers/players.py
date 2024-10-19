@@ -162,35 +162,6 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         }
     }
     await manager.broadcast_to_game(match.id, msg)
-
-
-@router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
-async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
-    try:
-        player = PlayerService(db).get_player_by_id(player_id)
-    except:
-        raise HTTPException(status_code=404, detail=f"Player not found")
-    try:
-        match = MatchService(db).get_match_by_id(match_id)
-    except:
-        raise HTTPException(status_code=404, detail=f"Match not found")
-    
-    next_player = end_turn_logic(player, match, db)
-    movs = give_movement_card_to_player(player_id, db)
-    
-    await notify_movement_card_to_player(player_id, match_id, movs)
-    await notify_all_players_movements_received(player, match)
-    await give_shape_card_to_player(player.id, db, is_init=False)
-    
-    msg = {
-        "key": "END_PLAYER_TURN", 
-        "payload": {
-            "current_player_name": player.player_name,
-            "next_player_name": next_player.player_name,
-            "next_player_turn": next_player.turn_order
-        }
-    }
-    await manager.broadcast_to_game(match.id, msg)
     
     
 def validate_partial_move(partialMove: PartialMove, card_type: str):
