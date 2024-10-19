@@ -22,9 +22,7 @@ class Board:
     def __getitem__(self, i: int):
         return self._matrix[i]
 
-
 Coordinate = collections.namedtuple("Coordinate", ["x", "y"])
-
 
 class Figure:
     def __init__(self, coordinates: tuple[Coordinate, ...]) -> None:
@@ -34,21 +32,14 @@ class Figure:
         return hash(self.coordinates)
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, Figure):
-            return self.coordinates == other.coordinates
-        elif isinstance(other, tuple):
-            return self.coordinates == other
-        else: raise NotImplementedError
-
+        if not isinstance(other, Figure):
+            raise NotImplementedError
+        return self.coordinates == other.coordinates
+    
     def __lt__(self, other: object) -> bool:
-        if isinstance(other, Figure):
-            return self.coordinates < other.coordinates
-        elif isinstance(other, tuple):
-            return self.coordinates < other
-        else: raise NotImplementedError
-
-    def __iter__(self):
-        return iter(self.coordinates)
+        if not isinstance(other, Figure):
+            raise NotImplementedError
+        return self.coordinates < other.coordinates
 
     def __str__(self):
         return str(self.coordinates)
@@ -57,7 +48,7 @@ class Figure:
         return str(self)
 
 
-Shape: typing.TypeAlias = tuple[Coordinate, ...]
+Shape: typing.TypeAlias = list[Coordinate]
 
 
 DIRECTIONS = [
@@ -66,7 +57,7 @@ DIRECTIONS = [
     (1, 0),
     (-1, 0),
 ]
-        
+
 
 def is_within_bounds(x: int, y: int, dimensions: tuple[int, int]) -> bool:
     """Checks if coordinates are within bounds of the board.
@@ -129,8 +120,7 @@ def get_all_board_shapes(board: Board) -> typing.Iterator[Shape]:
     Yields:
         shape formed from adjacent tiles of the same Colors.
     """
-    visited = [[False for _ in range(board.shape[1])]
-               for _ in range(board.shape[0])]
+    visited = [[False for _ in range(board.shape[1])] for _ in range(board.shape[0])]
     for i in range(board.shape[0]):
         for j in range(board.shape[1]):
             Colors = board[i][j]
@@ -162,52 +152,6 @@ def translate_shape_to_bottom_left(
 
     return new_shape
 
-
-def rotate_90_degrees(figure: Figure, board_dimensions: tuple[int,int]) -> Figure:
-    """Rotates the figure 90 degrees clockwise.
-    
-    Args:
-        figure: Figure to rotate
-        board_dimensions: dimensions of the board.
-
-    Return:
-        Rotated figure
-    """
-    new_figure = Figure(map(lambda coordinates: Coordinate(coordinates.y, board_dimensions[0] - 1 - coordinates.x), figure))
-    
-    return Figure(tuple(translate_shape_to_bottom_left(new_figure, board_dimensions)))
-
-def rotate_180_degrees(figure: Figure, board_dimensions: tuple[int,int]) -> Figure:
-    """Rotates the figure 180 degrees.
-    
-    Args:
-        figure: Figure to rotate
-        board_dimensions: dimensions of the board.
-
-    Return:
-        Rotated figure
-    """
-    new_figure = Figure(map(lambda coordinates: Coordinate(board_dimensions[0] - 1 - coordinates.x, board_dimensions[1] - 1 - coordinates.y), figure))
-    
-    return Figure(tuple(translate_shape_to_bottom_left(new_figure, board_dimensions)))
-
-    #return rotate_90_degrees(rotate_90_degrees(figure, board_dimensions), board_dimensions)
-
-def rotate_270_degrees(figure: Figure, board_dimensions: tuple[int,int]) -> Figure:
-    """Rotates the figure 270 degrees clockwise (i.e. 90 degrees counter-clockwise).
-    
-    Args:
-        figure: Figure to rotate
-        board_dimensions: dimensions of the board.
-
-    Return:
-        Rotated figure
-    """
-    new_figure = Figure(map(lambda coordinates: Coordinate(board_dimensions[0] - 1 - coordinates.y, coordinates.x), figure))
-    
-    return Figure(tuple(translate_shape_to_bottom_left(new_figure, board_dimensions)))
-
-    #return rotate_90_degrees(rotate_90_degrees(rotate_90_degrees(figure, board_dimensions), board_dimensions), board_dimensions)
 
 def find_board_figures(
     board: Board, figures_to_find: frozenset[Figure]
