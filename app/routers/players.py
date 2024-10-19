@@ -356,9 +356,6 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     msg ={"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
     await manager.broadcast_to_game(match_id, msg)       
     
-    return {"tiles":tiles , "movement_card":movement_card}
-    
-
     # Send Info about figures coordinates
     board_figures = None
     try:
@@ -373,4 +370,5 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
         "payload": board_figures
     }
 
+    return {"tiles":tiles , "movement_card":movement_card}
 
