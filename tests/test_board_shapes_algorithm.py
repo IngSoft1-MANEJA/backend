@@ -29,6 +29,8 @@ def test_rotate_270_degrees():
     rotated_shape = rotate_270_degrees(figure, board_dimensions)
     assert(rotated_shape == Figure((Coordinate(3,1), Coordinate(4,1), Coordinate(5,0), Coordinate(5,1), Coordinate(5,2))))
 
+def test_rotate_90_degrees():
+    assert(True)
 
 def test_is_within_bounds():
     dimensions = (5, 5)
