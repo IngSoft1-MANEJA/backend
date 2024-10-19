@@ -7,7 +7,12 @@ from random import shuffle
 from app.cruds.tile import TileService
 from app.models.enums import Colors
 from app.models.models import Boards, Tiles
-from app.utils.utils import validate_color, validate_turn, validate_board
+from app.utils.board_shapes_algorithm import *
+from app.utils.utils import FIGURE_COORDINATES, validate_color, validate_turn, validate_board, ALL_FIGURES
+from app.logger import logging
+
+logger = logging.getLogger(__name__)
+
 
 class BoardService:
     """
@@ -19,7 +24,7 @@ class BoardService:
             db: La session de la base de datos."""
         self.db = db
 
-    def create_board(self, match_id : int, ban_color : str = None):
+    def create_board(self, match_id: int, ban_color: str = None):
         """
         Crea un nuevo tablero en la base de datos.
         Args:
@@ -73,7 +78,7 @@ class BoardService:
             .all()
         )
         board = [
-            [tile.color for tile in tiles[i * 6 : (i + 1) * 6]]
+            [tile.color for tile in tiles[i * 6: (i + 1) * 6]]
             for i in range(6)
         ]
         return board
@@ -132,12 +137,13 @@ class BoardService:
             board: Tablero.
         """
         try:
-            board = self.db.query(Boards).filter(Boards.match_id == match_id).one()
+            board = self.db.query(Boards).filter(
+                Boards.match_id == match_id).one()
             return board
-        
+
         except NoResultFound:
-            raise NoResultFound("Board not found with match_id {match_id}") 
-    
+            raise NoResultFound("Board not found with match_id {match_id}")
+
     def update_list_of_parcial_movements(self, board_id: int, list_of_parcial_movements: List[Tiles], id_mov: int):
         """
         Actualiza la lista de movimientos parciales de un tablero.
@@ -147,12 +153,13 @@ class BoardService:
         """
         try:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
-            board.add_temporary_movement(list_of_parcial_movements[0], list_of_parcial_movements[1], id_mov) 
+            board.add_temporary_movement(
+                list_of_parcial_movements[0], list_of_parcial_movements[1], id_mov)
             self.db.commit()
-            
+
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")
-        
+
     def print_temporary_movements(self, board_id: int):
         """
         Obtiene la lista de movimientos temporales de un tablero.
@@ -164,10 +171,10 @@ class BoardService:
         try:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
             board.print_temporary_movements()
-        
+
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")
-        
+
     def get_last_temporary_movements(self, board_id: int):
         """
         Elimina la lista de movimientos temporales de un tablero.
@@ -178,6 +185,23 @@ class BoardService:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
             movement = board.get_last_movement()
             return movement
-        
+
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")
+
+    def get_formed_figures(self, board_id: int) -> List[Figure]:
+  
+        board_table = self.get_board_table(board_id)
+        board_figures = find_board_figures(Board(board_table), ALL_FIGURES)
+
+        str_to_log = ""
+        for i in board_table:
+            str_to_log += str(i) + "\n"
+        logger.info("Board: \n" + str_to_log)
+
+        str_to_log = ""
+        for i in board_figures:
+            str_to_log += str(i) + "\n"
+        logger.info("Figures coordinates found: \n" + str_to_log)
+
+        return board_figures
