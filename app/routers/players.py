@@ -233,6 +233,21 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": tiles}}
             await manager.broadcast_to_game(match_id, msg)
             
+            # Send Info about figures coordinates
+            board_figures = None
+            try:
+                match = MatchService(db).get_match_by_id(match_id)
+                board_figures = BoardService(db).get_formed_figures(match.board.id)
+            except Exception:
+                raise HTTPException(
+                    status_code=500, detail="Error with formed figures")
+
+            msg = {
+                "key": "ALLOW_FIGURES",
+                "payload": board_figures
+            }
+
+            await manager.send_to_player(match_id, player_id, msg)
             
         else:
             raise HTTPException(status_code=400, detail="Invalid movement")
