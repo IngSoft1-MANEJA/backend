@@ -13,6 +13,7 @@ from app.logger import logging
 
 logger = logging.getLogger(__name__)
 
+
 class BoardService:
     """
     Servicio para realizar operaciones CRUD sobre la tabla de Boards
@@ -187,11 +188,11 @@ class BoardService:
 
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")
-        
+
     def get_formed_figures(self, board_id: int) -> List[Figure]:
         figures_to_find = frozenset(
             list(map(lambda x: Figure(x), FIGURE_COORDINATES.values())))
-        
+
         board_table = self.get_board_table(board_id)
         board_figures = find_board_figures(Board(board_table), figures_to_find)
 
