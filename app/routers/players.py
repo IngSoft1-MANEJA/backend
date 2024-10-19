@@ -258,33 +258,49 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     if player.turn_order != match.current_player_turn:
         raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
     
+    tile_service = TileService(db)
+    board_service = BoardService(db)
+    movement_service = MovementCardService(db)
+    
     try:
-        tile_service = TileService(db)
-        board_service = BoardService(db)
-        movement_service = MovementCardService(db)
-        
-        board = board_service.get_board_by_id(match_id)
+        board = board_service.get_board_by_match_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Board not found")
+    
+    try:
         last_movement = board_service.get_last_temporary_movements(board.id)
-        if last_movement == None:
-            raise HTTPException(status_code=409, detail="No movements to undo")
+    except NoResultFound:
+        raise HTTPException(status_code=409, detail="No movements to undo")
         
-        tile1 = last_movement.tile1
-        tile2 = last_movement.tile2
-        movement_id = last_movement.id_mov
+    if last_movement == None:
+        raise HTTPException(status_code=409, detail="No movements to undo")
+    
+    tile1 = last_movement.tile1
+    tile2 = last_movement.tile2
+    movement_id = last_movement.id_mov
+    
+    try:
         movement_type = movement_service.get_movement_card_by_id(movement_id).mov_type
-        
-        aux_tile = copy.copy(tile1)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Movement card not found")
+    
+    aux_tile = copy.copy(tile1)
+    
+    try:
         tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
         tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
-        
-        board_service.print_temporary_movements(board.id)
-        tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
-        movement_card = (movement_id, movement_type)
-        msg ={"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
-        await manager.broadcast_to_game(match_id, msg)       
-        
-        return {"tiles":tiles , "movement_card":movement_card}
-    except HTTPException as e:
-        raise e
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
+    
+    try:
+        board_service.print_temporary_movements(board.id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Board not found")
+    
+    tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+    movement_card = (movement_id, movement_type)
+    msg ={"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
+    await manager.broadcast_to_game(match_id, msg)       
+    
+    return {"tiles":tiles , "movement_card":movement_card}
+    
