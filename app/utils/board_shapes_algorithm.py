@@ -59,7 +59,7 @@ DIRECTIONS = [
     (1, 0),
     (-1, 0),
 ]
-
+        
 
 def is_within_bounds(x: int, y: int, dimensions: tuple[int, int]) -> bool:
     """Checks if coordinates are within bounds of the board.
@@ -155,6 +155,32 @@ def translate_shape_to_bottom_left(
 
     return new_shape
 
+
+def rotate_90_degrees(figure: Figure, board_dimensions: tuple[int,int]) -> Figure:
+    """Rotates the figure 90 degrees clockwise.
+    
+    Args:
+        figure: Figure to rotate
+        board_dimensions: dimensions of the board.
+
+    Return:
+        Rotated figure
+    """
+    new_figure = Figure(map(lambda coordinates: Coordinate(coordinates.y, board_dimensions[0] - 1 - coordinates.x), figure))
+    
+    return new_figure
+
+def rotate_180_degrees(figure: Figure, board_dimensions: tuple[int,int]) -> Figure:
+    """Rotates the figure 180 degrees.
+    
+    Args:
+        figure: Figure to rotate
+        board_dimensions: dimensions of the board.
+
+    Return:
+        Rotated figure
+    """
+    return rotate_90_degrees(rotate_90_degrees(figure, board_dimensions), board_dimensions)
 
 def find_board_figures(
     board: Board, figures_to_find: frozenset[Figure]

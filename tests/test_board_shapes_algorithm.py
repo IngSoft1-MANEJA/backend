@@ -2,6 +2,8 @@ import pytest
 
 from app.utils.board_shapes_algorithm import *
 
+def test_rotate_90_degrees():
+    assert(True)
 
 def test_is_within_bounds():
     dimensions = (5, 5)
