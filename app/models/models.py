@@ -1,10 +1,10 @@
 from typing import List
-
 from pytest import Session
 from .enums import Colors, HardShapes, EasyShapes, Movements, MatchState
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates, DeclarativeBase
 from sqlalchemy import String, Integer, Boolean, ForeignKey
 from app.utils.utils import VALID_SHAPES
+
 # ================================================ MATCHES MODELS =================================#
 
 class Base(DeclarativeBase):
@@ -53,7 +53,6 @@ class Matches(Base):
 
 # ================================================ PLAYERS MODELS =================================#
 
-
 class Players(Base):
     """
         Model of the Players table in the database.
@@ -78,7 +77,7 @@ class Players(Base):
     session_token: Mapped[str] = mapped_column(String)
     turn_order: Mapped[int] = mapped_column(Integer, nullable=True)
     match_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey('matches.id'), nullable=True)
+        Integer, ForeignKey('matches.id', ondelete="CASCADE"), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship(
@@ -134,7 +133,7 @@ class Boards(Base):
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     ban_color: Mapped[str] = mapped_column(String(50), nullable=True)
-    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
+    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id', ondelete="CASCADE"))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     match: Mapped["Matches"] = relationship(
@@ -161,8 +160,8 @@ class Boards(Base):
     def print_temporary_movements(self):
         for movement in self.temporary_movements:
             print(f"Movement: {movement.tile1} -> {movement.tile2}, id_mov: {movement.id_mov}")
-# ================================================ TILES MODELS ===================================#
 
+# ================================================ TILES MODELS ===================================#
 
 class Tiles(Base):
     """
@@ -183,7 +182,7 @@ class Tiles(Base):
     color: Mapped[Colors] = mapped_column(String)
     position_x: Mapped[int] = mapped_column(Integer)
     position_y: Mapped[int] = mapped_column(Integer)
-    board_id: Mapped[int] = mapped_column(Integer, ForeignKey('boards.id'))
+    board_id: Mapped[int] = mapped_column(Integer, ForeignKey('boards.id', ondelete="CASCADE"))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     board: Mapped["Boards"] = relationship("Boards", back_populates="tiles")
@@ -209,7 +208,6 @@ class Tiles(Base):
 
 # ================================================ SHAPECARDS MODELS ==============================#
 
-
 class ShapeCards(Base):
     """
         Model of the ShapeCards table in the database.
@@ -232,7 +230,7 @@ class ShapeCards(Base):
     is_visible: Mapped[bool]
     is_blocked: Mapped[bool]
     player_owner: Mapped[int] = mapped_column(
-        Integer, ForeignKey('players.id'))
+        Integer, ForeignKey('players.id', ondelete="CASCADE"))
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     owner: Mapped["Players"] = relationship(
@@ -253,15 +251,14 @@ class ShapeCards(Base):
 
 # ================================================ MOVEMENTCARDS MODELS ===========================#
 
-
 class MovementCards(Base):
     __tablename__ = 'movementCards'
     __table_args__ = {'extend_existing': True}
     # --------------------------------- ATTRIBUTES -------------------------#
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     mov_type: Mapped[str]
-    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id'))
-    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id'), nullable=True)
+    match_id: Mapped[int] = mapped_column(Integer, ForeignKey('matches.id', ondelete="CASCADE"))
+    player_owner: Mapped[int] = mapped_column(Integer, ForeignKey('players.id', ondelete="CASCADE"), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     owner: Mapped["Players"] = relationship("Players", back_populates="movement_cards", post_update=True)
@@ -277,5 +274,3 @@ class MovementCards(Base):
     # --------------------------------- REPR -------------------------------#
     def __repr__(self):
         return (f"MovementCard(id={self.id!r}, mov_type={self.mov_type!r}, player_owner={self.player_owner!r})")
-
-# =================================================================================================#

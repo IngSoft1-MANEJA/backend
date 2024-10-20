@@ -70,7 +70,18 @@ def test_get_matches(client):
     assert response.status_code == 200
     assert isinstance(response.json(), list)
 
+def test_get_matches_by_string(client):
+    match1 = MagicMock(id=1, match_name="Test", max_players=4, is_public=True)
+    response = client.get("/matches/?s=Test")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
 
+def test_get_matches_by_max_players(client):
+    match1 = MagicMock(id=1, match_name="Test", max_players=4, is_public=True)
+    response = client.get("/matches/?max_players=4")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+    
 def test_get_match_by_id(client):
     # Primero, crea un match para obtener su ID
     response = client.post(
@@ -125,6 +136,12 @@ def test_start_match_success(client, load_matches):
         assert data['key'] == "START_MATCH"
         data = ws2.receive_json()
         assert data['key'] == "START_MATCH"
+
+def test_start_match_not_enough_players(client, load_data_for_test):
+    manager.create_game_connection(1)
+    with client.websocket_connect("/matches/1/ws/1") as ws1:
+        response = client.patch("/matches/1/start/1")
+        assert response.status_code == 404
 
 def test_create_movement_deck_success(client, load_matches, db_session):
     match = db_session.query(Matches).filter(Matches.id == 1).first()
