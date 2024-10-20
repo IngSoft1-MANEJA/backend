@@ -371,7 +371,7 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
         tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
-    
+ 
     #try:
     #    board_service.print_temporary_movements(board.id)
     #except NoResultFound:
@@ -398,4 +398,3 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     await manager.broadcast_to_game(match_id, msg2)
     
     return {"tiles":tiles , "movement_card":movement_card}
-
