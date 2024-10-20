@@ -135,7 +135,6 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
 
-
 @router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
 async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
     try:
@@ -316,7 +315,6 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
         tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
-        await manager.broadcast_to_game(match_id, msg)
     
     try:
         board_service.print_temporary_movements(board.id)
