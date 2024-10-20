@@ -313,7 +313,6 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             movement_service.update_card_owner_to_none(partialMove.movement_card)
         except NoResultFound:
             raise HTTPException(status_code=404, detail="Movement card not found")
-        #board_service.print_temporary_movements(board.id)
         
         tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
         msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": tiles}}
@@ -442,7 +441,6 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
 
     try:
         board = board_service.get_board_by_id(match.board.id)
-        board_service.print_temporary_movements(board.id)
         
         movements_to_cancel = []
         for _ in range(len(board.temporary_movements)):
