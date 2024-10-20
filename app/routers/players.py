@@ -5,6 +5,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy import select
 
 from app.cruds.movement_card import MovementCardService
+from app.cruds.shape_card import ShapeCardService
 from app.exceptions import *
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
@@ -16,8 +17,11 @@ from app.models import enums
 from app.models.enums import ReasonWinning
 from app.models.models import Players, Matches
 from app.routers.matches import give_movement_card_to_player, give_shape_card_to_player, notify_all_players_movements_received, notify_movement_card_to_player
-from app.schemas import PartialMove
+from app.schemas import PartialMove, UseFigure
 from app.utils.utils import validate_diagonal, validate_inverse_diagonal, validate_line, validate_line_between, validate_inverse_l, validate_l, validate_line_border
+from app.logger import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches")
 
@@ -224,7 +228,9 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
         if validate_partial_move(partialMove, card_type):
             tile_service = TileService(db)
             board_service = BoardService(db)
-            
+
+            formed_figures = board_service.get_formed_figures(match.board.id)
+
             board = board_service.get_board_by_match_id(match_id)
             tile1 = tile_service.get_tile_by_position(partialMove.tiles[0].rowIndex, partialMove.tiles[0].columnIndex, board.id)
             tile2 = tile_service.get_tile_by_position(partialMove.tiles[1].rowIndex, partialMove.tiles[1].columnIndex, board.id)
@@ -233,7 +239,13 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
             tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
                 
-            board_service.update_list_of_parcial_movements(board.id, [tile1, tile2], partialMove.movement_card) 
+            create_figure = False
+            new_formed_figures = board_service.get_formed_figures(match.board.id)
+
+            if set(new_formed_figures).difference(formed_figures):
+                create_figure = True
+
+            board_service.update_list_of_parcial_movements(board.id, [tile1, tile2], partialMove.movement_card, create_figure) 
             movement_service.update_card_owner_to_none(partialMove.movement_card)
             board_service.print_temporary_movements(board.id)
             
@@ -286,7 +298,7 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
         tile_service = TileService(db)
         board_service = BoardService(db)
         
-        board = board_service.get_board_by_id(match_id)
+        board = board_service.get_board_by_id(match.board.id)
         last_movement = board_service.get_last_temporary_movements(board.id)
         tile1 = last_movement.tile1
         tile2 = last_movement.tile2
@@ -317,3 +329,85 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     }
 
     await manager.broadcast_to_game(match_id, msg)
+
+@router.post("/{match_id}/player/{player_id}/use-figure", status_code=200)
+async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+    shape_card_service = ShapeCardService(db)
+    board_service = BoardService(db)
+    tile_service = TileService(db)
+
+    logger.info(body)
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    try:
+        player = player_service.get_player_by_id(player_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    if player.turn_order != match.current_player_turn:
+        raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
+    
+    try:
+        shape_card = shape_card_service.get_shape_card_by_id(body.figure_id)
+        if not shape_card in player.player.shape_cards:
+            raise HTTPException(status_code=404, detail="Shape Card doesn't belong to Player")
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Shape Card not found")
+    
+    # TODO validar las coordenadas correspondan a la figura
+
+    try:
+        board = board_service.get_board_by_id(match.board.id)
+        
+
+        board_service.print_temporary_movements(board.id)
+        movements_to_cancel = []
+        for _ in range(len(board.temporary_movements)):
+            last_movement = board_service.get_last_temporary_movements(board.id)
+            if last_movement.create_figure:
+                shape_card_service.delete_shape_card(body.figure_id)
+                msg = {
+                    "key": "COMPLETED_FIGURE",
+                    "payload": {
+                        "figure_id": body.figure_id
+                    }
+                }
+                break
+            tile1 = last_movement.tile1
+            tile2 = last_movement.tile2
+    
+            aux_tile = copy.copy(tile1)
+            tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
+            tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
+            movements_to_cancel.append(last_movement)
+        tiles = []
+        movements = []
+        for mov in movements_to_cancel:
+            movements.append((mov.id, mov.mov_type))
+            tile1 = tile_service.get_tile_by_id(mov.tile1.id)
+            tile2 = tile_service.get_tile_by_id(mov.tile2.id)
+            tiles.append((
+                (tile1.position_x, tile1.position_y), (tile2.position_x, tile2.position_y)
+            ))
+
+        for _ in range(board.temporary_movements):
+            last_movement = board_service.get_last_temporary_movements(board.id)
+            board_service.delete_temporary_movement(last_movement)
+        # Ver si reemplaza el for    
+        #temporary_movements = board.temporary_movements()
+        #board_service.clear_temporary_movements(last_movement)
+        board_service.print_temporary_movements(board.id)
+
+    except HTTPException as e:
+        raise e
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Tile not found")
+    
+    await manager.broadcast_to_game(match_id, msg)
+
+    return {"tiles": tiles, "movements": movements}

@@ -1,5 +1,6 @@
 from typing import List
 from pydantic import BaseModel
+from app.utils.board_shapes_algorithm import Figure
 
 class MatchCreateIn(BaseModel):
     lobby_name: str
@@ -38,3 +39,7 @@ class Tile(BaseModel):
 class PartialMove(BaseModel):
     tiles: List[Tile]
     movement_card: int
+
+class UseFigure(BaseModel):
+    figure_id: int
+    figure_coordinates: list[tuple]

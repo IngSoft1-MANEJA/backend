@@ -109,10 +109,11 @@ class Players(Base):
 
 # ================================================ BOARDS MODELS =================================#
 class TileMovement:
-    def __init__(self, tile1: "Tiles", tile2: "Tiles", id_mov: int):
+    def __init__(self, tile1: "Tiles", tile2: "Tiles", id_mov: int, create_figure = False):
         self.id_mov = id_mov
         self.tile1 = tile1
         self.tile2 = tile2
+        self.create_figure = create_figure
         
 
 class Boards(Base):
@@ -148,8 +149,8 @@ class Boards(Base):
         super().__init__(**kwargs)
         self.temporary_movements = []
 
-    def add_temporary_movement(self, tile1: "Tiles", tile2: "Tiles", id_mov: int):
-        movement = TileMovement(tile1, tile2, id_mov)
+    def add_temporary_movement(self, tile1: "Tiles", tile2: "Tiles", id_mov: int, create_figure: bool):
+        movement = TileMovement(tile1, tile2, id_mov, create_figure)
         self.temporary_movements.append(movement)
 
     def get_last_movement(self):
