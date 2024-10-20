@@ -305,6 +305,7 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     
     try:
         movement_type = movement_service.get_movement_card_by_id(movement_id).mov_type
+        movement_service.add_movement_card_to_player(player_id, movement_id)
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Movement card not found")
     
