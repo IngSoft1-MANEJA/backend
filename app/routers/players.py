@@ -487,10 +487,3 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
     await manager.broadcast_to_game(match_id, msg2)
 
     return {"movement_card": movements}
-
-@router.get("/{match_id}", status_code=200)
-async def get_all(match_id: int, db: Session = Depends(get_db)):
-    match_service = MatchService(db)
-    match = match_service.get_match_by_id(match_id)
-
-    return match.board
