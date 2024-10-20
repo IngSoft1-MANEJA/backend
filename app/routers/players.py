@@ -10,14 +10,20 @@ from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.cruds.tile import TileService
 from app.cruds.board import BoardService
+from app.cruds.shape_card import ShapeCardService
 from app.connection_manager import manager
 from app.database import get_db
 from app.models import enums
 from app.models.enums import ReasonWinning
 from app.models.models import Players, Matches
-from app.routers.matches import give_movement_card_to_player, give_shape_card_to_player, notify_all_players_movements_received, notify_movement_card_to_player
+from app.routers.matches import (give_movement_card_to_player, 
+                                 give_shape_card_to_player, 
+                                 notify_all_players_movements_received, 
+                                 notify_movement_card_to_player)
 from app.schemas import PartialMove
-from app.utils.utils import validate_diagonal, validate_inverse_diagonal, validate_line, validate_line_between, validate_inverse_l, validate_l, validate_line_border
+from app.utils.utils import (validate_diagonal, validate_inverse_diagonal, 
+                             validate_line, validate_line_between, 
+                             validate_inverse_l, validate_l, validate_line_border)
 
 router = APIRouter(prefix="/matches")
 
@@ -38,7 +44,35 @@ async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     except RuntimeError as e:
         # Manejar el caso en que el WebSocket ya esté cerrado
         print(f"Error al enviar mensaje: {e}")
-        
+     
+
+async def player_winner_by_no_shapes(player_winner: Players, match: Matches, db: Session):
+    """
+        Esta funcion maneja el caso en el que un jugador gana por no tener mas 
+        figuras
+        Args:
+            - player_winner: Jugador ganador
+            - match: Partida
+            - db: Session de la base de datos
+        Returns:
+            - None, notifica a los jugadores que el jugador ha ganado
+    """   
+    cant_shapes = ShapeCardService(db).get_visible_cards(player_winner.id, False).count()
+    
+    if cant_shapes == 0:
+        msg_win = {
+            "key" : "WINNER",
+            "payload": {
+                "player_id": player_winner.id,
+                "reason": ReasonWinning.NORMAL
+            }
+        }
+        PlayerService(db).delete_player(player_winner.id)
+        MatchService(db).update_match(match.id, "FINISHED", 0)
+        try:
+            await manager.broadcast_to_game(match.id, msg_win)
+        except RuntimeError as e:
+            print(f"Error al enviar mensaje: {e}")
 
 def end_turn_logic(player: Players, match: Matches, db: Session):
     match_service = MatchService(db)
