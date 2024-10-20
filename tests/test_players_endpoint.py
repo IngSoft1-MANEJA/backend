@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from fastapi import status, HTTPException
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import call, patch, MagicMock, AsyncMock
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm.session import Session
 
@@ -28,8 +28,10 @@ def setup_mocks():
          patch("app.cruds.board.BoardService.get_board_by_match_id") as mock_get_board_by_match_id, \
          patch("app.cruds.board.BoardService.update_list_of_parcial_movements") as mock_update_list_of_parcial_movements, \
          patch("app.cruds.movement_card.MovementCardService.update_card_owner_to_none") as mock_update_card_owner_to_none, \
+         patch("app.cruds.movement_card.MovementCardService.add_movement_card_to_player") as mock_add_movement_card_to_player, \
          patch("app.cruds.board.BoardService.print_temporary_movements") as mock_print_temporary_movements, \
          patch("app.cruds.board.BoardService.get_formed_figures") as mock_get_formed_figures, \
+         patch("app.cruds.board.BoardService.get_last_temporary_movements") as mock_get_last_temporary_movements, \
          patch("app.routers.players.validate_partial_move", return_value=True) as mock_validate_partial_move, \
          patch("app.routers.players.playerWinner", new_callable=AsyncMock) as mock_player_winner:
         
@@ -45,6 +47,8 @@ def setup_mocks():
             "mock_update_tile_position": mock_update_tile_position,
             "mock_get_board_by_match_id": mock_get_board_by_match_id,
             "mock_update_list_of_parcial_movements": mock_update_list_of_parcial_movements,
+            "mock_add_movement_card_to_player": mock_add_movement_card_to_player,
+            "mock_get_last_temporary_movements": mock_get_last_temporary_movements,
             "mock_update_card_owner_to_none": mock_update_card_owner_to_none,
             "mock_print_temporary_movements": mock_print_temporary_movements,
             "mock_get_formed_figures": mock_get_formed_figures,
@@ -179,10 +183,9 @@ def test_partial_move_success(setup_mocks):
     mocks["mock_update_tile_position"].assert_any_call(2, 0, 0)
     mocks["mock_update_list_of_parcial_movements"].assert_called_once()
     mocks["mock_update_card_owner_to_none"].assert_called_once()
-    mocks["mock_print_temporary_movements"].assert_called_once()
     expected_calls = [
-        (1, {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": [{"rowIndex": 1, "columnIndex": 1}, {"rowIndex": 0, "columnIndex": 0}]}}),
-        (1, {"key": "ALLOW_FIGURES", "payload": [{"figure": "1"}]}),
+        ((1, {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": [{"rowIndex": 0, "columnIndex": 0}, {"rowIndex": 1, "columnIndex": 1}]}}),),
+        ((1, {"key": "ALLOW_FIGURES", "payload": [{"figure": "1"}]}),)
     ]
     mocks["mock_broadcast_to_game"].assert_has_calls(expected_calls, any_order=True)
 
@@ -229,8 +232,8 @@ def test_partial_move_not_player_turn(setup_mocks):
 def test_partial_move_invalid_movement(setup_mocks):
     mocks = setup_mocks
     mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=False, turn_order=1)
-    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_turn=1)
-    mocks["mock_get_movement_card_by_id"].return_value = MagicMock(mov_type="Diagonal")
+    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
+    mocks["mock_get_movement_card_by_id"].return_value = MagicMock(mov_type="Line Border")
     
     with patch("app.routers.players.validate_partial_move", return_value=False):
         response = client.post("/matches/1/partial-move/1", json={
@@ -245,7 +248,7 @@ def test_partial_move_invalid_movement(setup_mocks):
 def test_partial_move_formed_figures_error(setup_mocks):
     mocks = setup_mocks
     mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=False, turn_order=1)
-    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_turn=1)
+    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
     mocks["mock_get_movement_card_by_id"].return_value = MagicMock(mov_type="Diagonal")
     mocks["mock_get_tile_by_position"].side_effect = [
         MagicMock(id=1, position_x=0, position_y=0),
@@ -258,6 +261,116 @@ def test_partial_move_formed_figures_error(setup_mocks):
         "tiles": [{"rowIndex": 0, "columnIndex": 0}, {"rowIndex": 1, "columnIndex": 1}],
         "movement_card": 1
     })
+    
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+    assert response.json() == {"detail": "Error with formed figures"}
+   
+    
+def test_delete_partial_move_success(setup_mocks):
+    mocks = setup_mocks
+    mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=True, turn_order=1)
+    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
+    mocks["mock_get_movement_card_by_id"].return_value = MagicMock(mov_type="Diagonal")
+    mocks["mock_get_last_temporary_movements"].return_value = MagicMock(tile1=MagicMock(id=1, position_x=0, position_y=0), tile2=MagicMock(id=2, position_x=1, position_y=1), id_mov=1)
+    mocks["mock_get_board_by_match_id"].return_value = MagicMock(id=1)
+    mocks["mock_get_formed_figures"].return_value = []
+    
+    response = client.delete("/matches/1/partial-move/1")
+    
+    assert response.status_code == status.HTTP_200_OK
+    mocks["mock_update_tile_position"].assert_any_call(1, 1, 1)
+    mocks["mock_update_tile_position"].assert_any_call(2, 0, 0)
+    mocks["mock_add_movement_card_to_player"].assert_called_once()
+    
+    expected_calls = [
+        call(1, {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": [{"rowIndex": 0, "columnIndex": 0}, {"rowIndex": 1, "columnIndex": 1}]}}),
+        call(1, {"key": "ALLOW_FIGURES", "payload": []})
+    ]
+    mocks["mock_broadcast_to_game"].assert_has_calls(expected_calls, any_order=True)
+
+
+def test_delete_partial_move_match_not_found(setup_mocks):
+    mocks = setup_mocks
+    mocks["mock_get_match_by_id"].side_effect = NoResultFound("Match not found")
+    
+    response = client.delete("/matches/1/partial-move/1")
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {"detail": "Match not found"}
+
+
+def test_delete_partial_move_player_not_found(setup_mocks):
+    mocks = setup_mocks
+    mocks["mock_get_player_by_id"].side_effect = ValueError("Player not found")
+    
+    response = client.delete("/matches/1/partial-move/1")   
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {"detail": "Player not found"}
+
+
+def test_delete_partial_move_not_player_turn(setup_mocks):
+    mocks = setup_mocks
+    mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=False, turn_order=2)
+    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
+    
+    response = client.delete("/matches/1/partial-move/1")
+    
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.json() == {"detail": "It's not player Player 1's turn"}
+
+
+def test_delete_partial_move_no_movements_to_undo(setup_mocks):
+    mocks = setup_mocks
+    mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=True, turn_order=1)
+    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
+    mocks["mock_get_last_temporary_movements"].return_value = None
+    
+    response = client.delete("/matches/1/partial-move/1")
+    
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json() == {"detail": "No movements to undo"}
+
+
+def test_delete_partial_move_movement_card_not_found(setup_mocks):
+    mocks = setup_mocks
+    mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=True, turn_order=1)
+    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
+    mocks["mock_get_last_temporary_movements"].return_value = MagicMock(tile1=MagicMock(id=1, position_x=0, position_y=0), tile2=MagicMock(id=2, position_x=1, position_y=1), id_mov=1)
+    mocks["mock_get_board_by_match_id"].return_value = MagicMock(id=1)
+    mocks["mock_get_movement_card_by_id"].side_effect = NoResultFound("Movement card not found")
+    
+    response = client.delete("/matches/1/partial-move/1")
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {"detail": "Movement card not found"}
+
+
+def test_delete_partial_move_tile_not_found(setup_mocks):
+    mocks = setup_mocks
+    mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=True, turn_order=1)
+    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
+    mocks["mock_get_last_temporary_movements"].return_value = MagicMock(tile1=MagicMock(id=1, position_x=0, position_y=0), tile2=MagicMock(id=2, position_x=1, position_y=1), id_mov=1)
+    mocks["mock_get_board_by_match_id"].return_value = MagicMock(id=1)
+    mocks["mock_get_movement_card_by_id"].return_value = MagicMock(mov_type="Diagonal")
+    mocks["mock_update_tile_position"].side_effect = NoResultFound("Tile not found")
+    
+    response = client.delete("/matches/1/partial-move/1")
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json() == {"detail": "Tile not found"}
+
+
+def test_delete_partial_move_formed_figures_error(setup_mocks):
+    mocks = setup_mocks
+    mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=True, turn_order=1)
+    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
+    mocks["mock_get_last_temporary_movements"].return_value = MagicMock(tile1=MagicMock(id=1, position_x=0, position_y=0), tile2=MagicMock(id=2, position_x=1, position_y=1), id_mov=1)
+    mocks["mock_get_board_by_match_id"].return_value = MagicMock(id=1)
+    mocks["mock_get_movement_card_by_id"].return_value = MagicMock(mov_type="Diagonal")
+    mocks["mock_get_formed_figures"].side_effect = Exception("Error with formed figures")
+    
+    response = client.delete("/matches/1/partial-move/1")
     
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert response.json() == {"detail": "Error with formed figures"}
