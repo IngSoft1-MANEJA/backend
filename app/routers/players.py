@@ -363,9 +363,8 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
 
     try:
         board = board_service.get_board_by_id(match.board.id)
-        
-
         board_service.print_temporary_movements(board.id)
+        
         movements_to_cancel = []
         for _ in range(len(board.temporary_movements)):
             last_movement = board_service.get_last_temporary_movements(board.id)
@@ -409,5 +408,7 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
         raise HTTPException(status_code=404, detail="Tile not found")
     
     await manager.broadcast_to_game(match_id, msg)
+
+    # TODO broadcast de los movimientos revertidos (copiar logica de UNDO_PARTIAL_MOVEMENT)
 
     return {"tiles": tiles, "movements": movements}
