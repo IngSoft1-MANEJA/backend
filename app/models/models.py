@@ -113,7 +113,7 @@ class TileMovement:
         self.tile1 = tile1
         self.tile2 = tile2
         self.create_figure = create_figure
-        
+
 
 class Boards(Base):
     """
@@ -230,7 +230,7 @@ class ShapeCards(Base):
     is_visible: Mapped[bool]
     is_blocked: Mapped[bool]
     player_owner: Mapped[int] = mapped_column(
-        Integer, ForeignKey('players.id', ondelete="CASCADE"))
+        Integer, ForeignKey('players.id', ondelete="CASCADE"), nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     owner: Mapped["Players"] = relationship(

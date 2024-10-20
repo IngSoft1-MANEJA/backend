@@ -299,7 +299,13 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
         create_figure = False
         new_formed_figures = board_service.get_formed_figures(match.board.id)
 
-        if set(new_formed_figures).difference(formed_figures):
+        for figure in formed_figures:
+            try:
+                new_formed_figures.remove(figure)
+            except ValueError:
+                continue
+
+        if new_formed_figures:
             create_figure = True
 
         board_service.update_list_of_parcial_movements(board.id, [tile1, tile2], partialMove.movement_card, create_figure) 
@@ -337,7 +343,10 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
 async def delete_partial_move(match_id: int, player_id: int, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
-    
+    tile_service = TileService(db)
+    board_service = BoardService(db)
+    movement_service = MovementCardService(db)
+
     try:
         match = match_service.get_match_by_id(match_id)
     except NoResultFound:
@@ -350,10 +359,6 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     
     if player.turn_order != match.current_player_turn:
         raise HTTPException(status_code=403, detail=f"It's not player {player.player_name}'s turn")
-    
-    tile_service = TileService(db)
-    board_service = BoardService(db)
-    movement_service = MovementCardService(db)
     
     try:
         board = board_service.get_board_by_match_id(match_id)
@@ -383,13 +388,10 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
  
-    #try:
-    #    board_service.print_temporary_movements(board.id)
-    #except NoResultFound:
-    #    raise HTTPException(status_code=404, detail="Board not found")
     
     tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
     movement_card = (movement_id, movement_type)
+
     msg ={"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
     await manager.broadcast_to_game(match_id, msg)       
     
@@ -402,11 +404,8 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
         raise HTTPException(
             status_code=500, detail="Error with formed figures")
 
-    msg2 = {
-        "key": "ALLOW_FIGURES",
-        "payload": board_figures
-    }
-    await manager.broadcast_to_game(match_id, msg2)
+    msg = { "key": "ALLOW_FIGURES", "payload": board_figures }
+    await manager.broadcast_to_game(match_id, msg)
     
     return {"tiles":tiles , "movement_card":movement_card}
 
@@ -434,7 +433,7 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
     
     try:
         shape_card = shape_card_service.get_shape_card_by_id(body.figure_id)
-        if not shape_card in player.player.shape_cards:
+        if not shape_card.is_visible or shape_card.player_owner != player_id:
             raise HTTPException(status_code=404, detail="Shape Card doesn't belong to Player")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Shape Card not found")
@@ -450,7 +449,7 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
             last_movement = board_service.get_last_temporary_movements(board.id)
             if last_movement.create_figure:
                 shape_card_service.delete_shape_card(body.figure_id)
-                msg = {
+                msg2 = {
                     "key": "COMPLETED_FIGURE",
                     "payload": {
                         "figure_id": body.figure_id
@@ -464,6 +463,7 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
             tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
             tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
             movements_to_cancel.append(last_movement)
+            
         tiles = []
         movements = []
         for mov in movements_to_cancel:
@@ -471,24 +471,28 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
             tile1 = tile_service.get_tile_by_id(mov.tile1.id)
             tile2 = tile_service.get_tile_by_id(mov.tile2.id)
             tiles.append((
-                (tile1.position_x, tile1.position_y), (tile2.position_x, tile2.position_y)
+                {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}
             ))
 
-        for _ in range(board.temporary_movements):
+        for _ in board.temporary_movements:
             last_movement = board_service.get_last_temporary_movements(board.id)
-            board_service.delete_temporary_movement(last_movement)
-        # Ver si reemplaza el for    
-        #temporary_movements = board.temporary_movements()
-        #board_service.clear_temporary_movements(last_movement)
-        board_service.print_temporary_movements(board.id)
 
     except HTTPException as e:
         raise e
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
     
-    await manager.broadcast_to_game(match_id, msg)
+    if tiles:
+        msg ={"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
+        await manager.broadcast_to_game(match_id, msg)
 
-    # TODO broadcast de los movimientos revertidos (copiar logica de UNDO_PARTIAL_MOVEMENT)
+    await manager.broadcast_to_game(match_id, msg2)
 
-    return {"tiles": tiles, "movements": movements}
+    return {"movement_card": movements}
+
+@router.get("/{match_id}", status_code=200)
+async def get_all(match_id: int, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    match = match_service.get_match_by_id(match_id)
+
+    return match.board

@@ -42,4 +42,4 @@ class PartialMove(BaseModel):
 
 class UseFigure(BaseModel):
     figure_id: int
-    figure_coordinates: list[tuple]
+    coordinates: list[tuple]

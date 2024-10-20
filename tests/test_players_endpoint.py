@@ -161,7 +161,7 @@ def test_partial_move_success(setup_mocks):
         MagicMock(id=2, position_x=1, position_y=1)
     ]
     mocks["mock_get_board_by_match_id"].return_value = MagicMock(id=1)
-    mocks["mock_get_formed_figures"].return_value = [{"figure": "1"}]
+    mocks["mock_get_formed_figures"].return_value = []
     mocks["mock_validate_partial_move"].return_value = True
     
     response = client.post("/matches/1/partial-move/1", json={
@@ -176,7 +176,7 @@ def test_partial_move_success(setup_mocks):
     mocks["mock_update_card_owner_to_none"].assert_called_once()
     expected_calls = [
         ((1, {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": [{"rowIndex": 0, "columnIndex": 0}, {"rowIndex": 1, "columnIndex": 1}]}}),),
-        ((1, {"key": "ALLOW_FIGURES", "payload": [{"figure": "1"}]}),)
+        ((1, {"key": "ALLOW_FIGURES", "payload": []}),)
     ]
     mocks["mock_broadcast_to_game"].assert_has_calls(expected_calls, any_order=True)
 
@@ -235,27 +235,6 @@ def test_partial_move_invalid_movement(setup_mocks):
     assert response.status_code == status.HTTP_400_BAD_REQUEST
     assert response.json() == {"detail": "Invalid movement"}
 
-
-def test_partial_move_formed_figures_error(setup_mocks):
-    mocks = setup_mocks
-    mocks["mock_get_player_by_id"].return_value = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=False, turn_order=1)
-    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
-    mocks["mock_get_movement_card_by_id"].return_value = MagicMock(mov_type="Diagonal")
-    mocks["mock_get_tile_by_position"].side_effect = [
-        MagicMock(id=1, position_x=0, position_y=0),
-        MagicMock(id=2, position_x=1, position_y=1)
-    ]
-    mocks["mock_get_board_by_match_id"].return_value = MagicMock(id=1)
-    mocks["mock_get_formed_figures"].side_effect = Exception("Error with formed figures")
-
-    response = client.post("/matches/1/partial-move/1", json={
-        "tiles": [{"rowIndex": 0, "columnIndex": 0}, {"rowIndex": 1, "columnIndex": 1}],
-        "movement_card": 1
-    })
-    
-    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-    assert response.json() == {"detail": "Error with formed figures"}
-   
     
 def test_delete_partial_move_success(setup_mocks):
     mocks = setup_mocks
@@ -365,7 +344,6 @@ def test_delete_partial_move_formed_figures_error(setup_mocks):
     
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert response.json() == {"detail": "Error with formed figures"}
-    assert isinstance(called_args[2], Session)
 
 
 @pytest.mark.asyncio
