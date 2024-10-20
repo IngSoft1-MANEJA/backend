@@ -6,7 +6,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm.session import Session
 
 from app.main import app
-from app.routers.matches import manager
+from app.routers.players import playerWinner
 from app.models.enums import ReasonWinning
 from app.schemas import PartialMove, Tile
 from app.exceptions import PlayerNotConnected
@@ -20,6 +20,7 @@ def setup_mocks():
          patch("app.cruds.match.MatchService.get_match_by_id") as mock_get_match_by_id, \
          patch("app.cruds.player.PlayerService.delete_player") as mock_delete_player, \
          patch("app.cruds.match.MatchService.update_match") as mock_update_match, \
+         patch("app.cruds.match.MatchService.delete_match") as mock_delete_match, \
          patch("app.routers.matches.manager.broadcast_to_game") as mock_broadcast_to_game, \
          patch("app.routers.matches.manager.disconnect_player_from_game") as mock_disconnect_player_from_game, \
          patch("app.cruds.movement_card.MovementCardService.get_movement_card_by_id") as mock_get_movement_card_by_id, \
@@ -41,6 +42,7 @@ def setup_mocks():
             "mock_delete_player": mock_delete_player,
             "mock_update_match": mock_update_match,
             "mock_broadcast_to_game": mock_broadcast_to_game,
+            "mock_delete_match": mock_delete_match,
             "mock_disconnect_player_from_game": mock_disconnect_player_from_game,
             "mock_get_movement_card_by_id": mock_get_movement_card_by_id,
             "mock_get_tile_by_position": mock_get_tile_by_position,
@@ -80,18 +82,7 @@ def test_leave_player_not_in_match(setup_mocks):
     
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json() == {"detail": "Player not in match"}
-
-
-def test_leave_player_owner_cannot_leave(setup_mocks):
-    mocks = setup_mocks
-    mocks["mock_get_player_by_id"].return_value = MagicMock(id=3, player_name="Player 3", match_id=1, is_owner=True)
-    mocks["mock_get_match_by_id"].return_value = MagicMock(id=1, state="WAITING", current_players=2)
     
-    response = client.delete("/matches/1/left/3")
-    
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert response.json() == {"detail": "Owner cannot leave match"}
-
 
 def test_leave_player_not_connected(setup_mocks):
     mocks = setup_mocks
@@ -374,3 +365,31 @@ def test_delete_partial_move_formed_figures_error(setup_mocks):
     
     assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
     assert response.json() == {"detail": "Error with formed figures"}
+    assert isinstance(called_args[2], Session)
+
+
+@pytest.mark.asyncio
+async def test_owner_leave_match(setup_mocks):
+    mocks = setup_mocks
+    owner = MagicMock(id=1, player_name="Owner", match_id=1, is_owner=True)
+    player2 = MagicMock(id=2, player_name="Player 2", match_id=1, is_owner=False)
+    match = MagicMock(id=1, state="WAITING", current_players=2, players=[owner, player2])
+    
+    mocks["mock_get_player_by_id"].return_value = owner
+    mocks["mock_get_match_by_id"].return_value = match
+
+    response = client.delete("/matches/1/left/1")
+    
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json() == {"message": "The match has been canceled because the owner has left."}
+    mocks["mock_broadcast_to_game"].assert_called_once_with(1, {
+        "key": "PLAYER_LEFT",
+        "payload": {
+            "owner_name": "Owner",
+            "is_owner": True
+        }
+    })
+    mocks["mock_disconnect_player_from_game"].assert_called()
+    mocks["mock_delete_match"].assert_called_once_with(1)
+    
+    
