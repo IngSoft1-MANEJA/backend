@@ -63,77 +63,125 @@ def end_turn_logic(player: Players, match: Matches, db: Session):
     
     return next_player
 
+async def owner_leave(owner: Players, match: Matches, db: Session):
+    """
+    Handles the owner leaving the match:
+        - If the match has not started, notify other players that the owner has left.
+          Then delete the match.
+    Args:
+        owner (Players): The owner player of the match.
+        match (Matches): The match the player belongs to.
+        db (Session): Database session.
+    Returns:
+        dict: Message indicating the match has been canceled.
+    """
+    match_service = MatchService(db)
+    
+    # Disconnect the owner from the game
+    try:
+        manager.disconnect_player_from_game(match.id, owner.id)
+    except PlayerNotConnected:
+        pass
+    
+    # Notify other players that the owner has left
+    msg = {
+        "key": "PLAYER_LEFT",
+        "payload": {
+            "owner_name": owner.player_name,
+            "is_owner": True
+        }
+    }
+    try:
+        await manager.broadcast_to_game(match.id, msg)
+    except RuntimeError as e:
+        print(f"Error al enviar mensaje: {e}")
+    
+    # Disconnect all players from the game and delete the match
+    for player in match.players:
+        if player.id != owner.id:
+            try:
+                manager.disconnect_player_from_game(match.id, player.id)
+            except PlayerNotConnected:
+                print(f"Player {player.id} not connected")
+                pass
+    
+    match_service.delete_match(match.id)
+    
+    return {"message": "The match has been canceled because the owner has left."}
+
 @router.delete("/{match_id}/left/{player_id}")
 async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
+    """
+    Endpoint to handle a player leaving a match.
+    Args:
+        player_id (int): The ID of the player leaving the match.
+        match_id (int): The ID of the match the player is leaving.
+        db (Session): Database session dependency.
+    Raises:
+        HTTPException: If the player is not found.
+        HTTPException: If the match is not found.
+        HTTPException: If the player is not part of the match.
+        HTTPException: If the player is the owner and the match is in the "WAITING" state.
+    Returns:
+        dict: A dictionary containing the player ID and player name of the player who left the match.
+    """
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+
     try:
-        match_service = MatchService(db)
-        player_service = PlayerService(db)
-        try:
-            player_to_delete = player_service.get_player_by_id(player_id)
-        except ValueError:
-            raise HTTPException(status_code=404, detail=f"Player not found with id: {player_id}") 
-               
+        player_to_delete = player_service.get_player_by_id(player_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Player not found with id: {player_id}")
+
+    try:
         match_to_leave = match_service.get_match_by_id(match_id)
-
-        player_name = player_to_delete.player_name
-        player_match = player_to_delete.match_id
-
-        if player_match != match_id:
-            raise HTTPException(status_code=404, detail="Player not in match")
-
-        # IN LOBBY
-        if match_to_leave.state == "WAITING":
-            if player_to_delete.is_owner:
-                raise HTTPException(status_code=400, detail="Owner cannot leave match")
-                
-        # Si el jugador se quiere salir en su turno, obtener el siguiente jugador antes de eliminar
-        if player_to_delete.turn_order == match_to_leave.current_player_turn:
-            next_player = end_turn_logic(player_to_delete, match_to_leave, db)
-        else:
-            next_player = None
-        
-        player_service.delete_player(player_id)
-
-        try:
-            manager.disconnect_player_from_game(match_id, player_id)
-        except PlayerNotConnected:
-            # El jugador ya ha sido desconectado, no hacer nada
-            pass
-        
-        match_service.update_match(match_id, match_to_leave.state, match_to_leave.current_players - 1)
-        
-        msg = {"key": "PLAYER_LEFT", "payload": {"name": player_name}}
-        
-        try:
-            await manager.broadcast_to_game(match_id, msg)
-        except RuntimeError as e:
-            # Manejar el caso en que el WebSocket ya esté cerrado
-            print(f"Error al enviar mensaje: {e}")
-
-        # Notificar a los jugadores sobre el cambio de turno si el jugador que se salió era el dueño del turno
-        if next_player:
-            msg= {
-                "key": "END_PLAYER_TURN", 
-                "payload": {
-                    "current_player_name": player_name,
-                    "next_player_name": next_player.player_name,
-                    "next_player_turn": next_player.turn_order
-                }
-            }
-            await manager.broadcast_to_game(match_id, msg)
-        
-        if (match_to_leave.current_players) == 1 and match_to_leave.state == "STARTED":
-            await playerWinner(match_id, ReasonWinning.FORFEIT, db)
-        
-        return {"player_id": player_id, "players": player_name}
-
-    except PlayerNotConnected as e:
-        raise HTTPException(
-            status_code=404, detail="Player not connected to match")    
-    except GameConnectionDoesNotExist as e:
-        raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
+
+    if player_to_delete.match_id != match_id:
+        raise HTTPException(status_code=404, detail="Player not in match")
+
+    player_name = player_to_delete.player_name
+
+    if player_to_delete.is_owner and match_to_leave.state == "WAITING":
+        return await owner_leave(player_to_delete, match_to_leave, db)
+
+    next_player = None
+    if player_to_delete.turn_order == match_to_leave.current_player_turn:
+        next_player = end_turn_logic(player_to_delete, match_to_leave, db)
+
+    player_service.delete_player(player_id)
+
+    try:
+        manager.disconnect_player_from_game(match_id, player_id)
+    except PlayerNotConnected:
+        pass
+
+    match_service.update_match(match_id, match_to_leave.state, match_to_leave.current_players - 1)
+
+    msg = {"key": "PLAYER_LEFT", "payload": {"name": player_name}}
+    try:
+        await manager.broadcast_to_game(match_id, msg)
+        print(f"Player {player_name} left the match")
+    except RuntimeError as e:
+        print(f"Error al enviar mensaje: {e}")
+
+    if next_player:
+        msg = {
+            "key": "END_PLAYER_TURN",
+            "payload": {
+                "current_player_name": player_name,
+                "next_player_name": next_player.player_name,
+                "next_player_turn": next_player.turn_order
+            }
+        }
+        await manager.broadcast_to_game(match_id, msg)
+
+    if match_to_leave.current_players == 1 and match_to_leave.state == "STARTED":
+        await playerWinner(match_id, ReasonWinning.FORFEIT, db)
+
+    return {"player_id": player_id, "players": player_name}
+
 
 @router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
 async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
@@ -162,7 +210,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         }
     }
     await manager.broadcast_to_game(match.id, msg)
-    
+
     
 def validate_partial_move(partialMove: PartialMove, card_type: str):
     if len(partialMove.tiles) != 2:
