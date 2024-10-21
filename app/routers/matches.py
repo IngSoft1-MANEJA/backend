@@ -151,7 +151,7 @@ def create_movement_deck(db: Session, match_id: int):
             movement_service.create_movement_card(mov.value, match_id)
 
 
-def give_movement_card_to_player(player_id: int, db: Session):
+def give_movement_card_to_player(player_id: int, db: Session) -> list[tuple[int, str]]:
     """
     Da hasta 3 cartas de movimiento al jugador.
     Args:
@@ -236,7 +236,7 @@ async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
 
     if not is_init:
         msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
-                   "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
+                   "payload": [{"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}]}
         await manager.broadcast_to_game(player.match_id, msg_all)
 # =============================================================================================================
 

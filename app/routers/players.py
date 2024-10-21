@@ -465,20 +465,24 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
                 status_code=404, detail="Figure card doesn't belong to Player")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Figure Card not found")
-
-    valid_coordinates = FIGURE_COORDINATES[shape_card.shape_type.name]
+    
+    if shape_card.is_hard:
+        shape_type = HardShapes(shape_card.shape_type)
+    else:
+        shape_type = EasyShapes(shape_card.shape_type)
+         
+    valid_coordinates = FIGURE_COORDINATES[shape_type.name]
     all_valid_rotations = [valid_coordinates, rotate_90_degrees(valid_coordinates, (6, 6)), rotate_180_degrees(
         valid_coordinates, (6, 6)), rotate_270_degrees(valid_coordinates, (6, 6))]
 
     try:
         board = board_service.get_board_by_id(match.board.id)
 
-        figures_found = board_service.get_formed_figures(board.id)
+        figures_found = list(map(lambda x: Figure(x), board_service.get_formed_figures(board.id)))
         coordinates = request.coordinates
-        figure_to_find = Figure(translate_shape_to_bottom_left(
-            Figure(tuple(map(lambda x: Coordinate(x[0], x[1]), coordinates))), (6,6)))
+        figure_to_find = Figure(tuple(map(lambda x: Coordinate(x[0], x[1]), coordinates)))
 
-        if not figure_to_find in figures_found or not figure_to_find in all_valid_rotations:
+        if not figure_to_find in figures_found or not Figure(translate_shape_to_bottom_left(figure_to_find, (6,6))) in all_valid_rotations:
             raise HTTPException(
                 status_code=409, detail="Conflict with coordinates and Figure Card")
 
@@ -494,6 +498,8 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
 
             movement = movement_card_service.get_movement_card_by_id(
                 last_movement.id_mov)
+            movement_card_service.add_movement_card_to_player(player_id, movement.id)
+            
             movements.append((movement.id, movement.mov_type))
             tiles.append((
                 {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {

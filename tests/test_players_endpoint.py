@@ -433,7 +433,7 @@ def test_use_figure_exceptions1(setup_mocks, client):
 
 @pytest.fixture(scope="function")
 def setup_mocks2():
-    with patch("app.cruds.shape_card.ShapeCardService.get_shape_card_by_id", return_value=MagicMock(id=1, player_owner=1, is_visible=True, is_hard=False, shape_type=EasyShapes.MINI_LINE)) as get_shape_card_by_id, \
+    with patch("app.cruds.shape_card.ShapeCardService.get_shape_card_by_id", return_value=MagicMock(id=1, player_owner=1, is_visible=True, is_hard=False, shape_type=EasyShapes.MINI_LINE.value)) as get_shape_card_by_id, \
             patch("app.cruds.shape_card.ShapeCardService.delete_shape_card") as delete_shape_card:
         yield {
             "get_shape_card_by_id": get_shape_card_by_id,
