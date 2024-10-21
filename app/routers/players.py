@@ -415,6 +415,7 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
     shape_card_service = ShapeCardService(db)
     board_service = BoardService(db)
     tile_service = TileService(db)
+    movement_card_service = MovementCardService(db)
 
     logger.info(body)
     try:
@@ -442,7 +443,8 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
     try:
         board = board_service.get_board_by_id(match.board.id)
         
-        movements_to_cancel = []
+        movements = []
+        tiles = []
         for _ in range(len(board.temporary_movements)):
             last_movement = board_service.get_last_temporary_movements(board.id)
             if last_movement.create_figure:
@@ -456,22 +458,17 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
                 break
             tile1 = last_movement.tile1
             tile2 = last_movement.tile2
+
+            movement = movement_card_service.get_movement_card_by_id(last_movement.id_mov)
+            movements.append((movement.id, movement.mov_type))
+            tiles.append((
+                {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}
+            ))
     
             aux_tile = copy.copy(tile1)
             tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
             tile_service.update_tile_position(tile2.id, aux_tile.position_x, aux_tile.position_y)
-            movements_to_cancel.append(last_movement)
             
-        tiles = []
-        movements = []
-        for mov in movements_to_cancel:
-            movements.append((mov.id, mov.mov_type))
-            tile1 = tile_service.get_tile_by_id(mov.tile1.id)
-            tile2 = tile_service.get_tile_by_id(mov.tile2.id)
-            tiles.append((
-                {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}
-            ))
-
         for _ in board.temporary_movements:
             last_movement = board_service.get_last_temporary_movements(board.id)
 
