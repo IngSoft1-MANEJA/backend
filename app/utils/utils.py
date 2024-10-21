@@ -91,7 +91,7 @@ def validate_movement(movement: str):
 
 def validate_add_shape_card_to_hand(player_id: int, count_cards: int):
     if count_cards > 3:
-        raise e.HandIsFull(player_id)
+        raise e.ShapeCardHandIsFull(player_id)
 
 
 def validate_turn(current_player: int, next_player_turn: int, board_id: int):
