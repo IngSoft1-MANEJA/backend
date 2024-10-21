@@ -30,10 +30,10 @@ class MovementCardService:
         """
         validate_movement(mov_type)
         if player_owner is None:
-            movement_card = MovementCards(mov_type=mov_type, match_id = match_id)
+            movement_card = MovementCards(mov_type=mov_type, match_id=match_id)
         else:
             movement_card = MovementCards(
-                mov_type=mov_type, player_owner=player_owner, match_id = match_id)
+                mov_type=mov_type, player_owner=player_owner, match_id=match_id)
         self.db.add(movement_card)
         self.db.commit()
         self.db.refresh(movement_card)
@@ -66,7 +66,6 @@ class MovementCardService:
             return movement_card
         except NoResultFound:
             raise MovementCardNotFound(movement_card_id)
-
 
     def get_movement_card_by_user(self, player_owner: int) -> List[MovementCards]:
         """
@@ -123,7 +122,7 @@ class MovementCardService:
         Obtiene la lista de cartas de movimiento de un match.
 
         Args:
-            match_id : Id del match.
+            match_id: Id del match.
         Returns:
             MovementCards: Lista de movement_cards.
         """
@@ -132,8 +131,8 @@ class MovementCardService:
         if not movement_cards:
             raise NoMovementCardsFound(match_id)
         return movement_cards
-    
-    def add_movement_card_to_player(self, player_id: int, movement_card_id: int):
+
+    def add_movement_card_to_player(self, player_id: int, movement_card_id: int) -> MovementCards:
         """
         Agrega una carta de movimiento a un jugador.
 
@@ -148,27 +147,28 @@ class MovementCardService:
         self.db.commit()
         self.db.refresh(movement_card)
         return movement_card
-    
+
     def get_movement_cards_without_owner(self, match_id: int) -> List[MovementCards]:
         """
         Obtiene la lista de cartas de movimiento sin jugadores asignados.
         Args:
-            - match_id : Id del match.
+            match_id : Id del match.
+
         Returns:
             MovementCards: Lista de movement_cards.
         """
         movement_cards = self.db.query(MovementCards).filter(
-            MovementCards.match_id == match_id, 
+            MovementCards.match_id == match_id,
             MovementCards.player_owner == None).all()
         return movement_cards
-    
-    def update_card_owner_to_none(self, movement_card_id: int):
+
+    def update_card_owner_to_none(self, movement_card_id: int) -> MovementCards:
         """
         Actualiza el propietario de una carta de movimiento.
 
         Args:
-            - movement_card_id : Id de la carta de movimiento.
-            - player_id : Id del nuevo propietario.
+            movement_card_id : Id de la carta de movimiento.
+            player_id : Id del nuevo propietario.
         Returns:
             none.
         """

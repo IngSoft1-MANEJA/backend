@@ -175,7 +175,7 @@ class BoardService:
         except NoResultFound:
             raise NoResultFound("Board not found with id {board_id}")
 
-    def get_last_temporary_movements(self, board_id: int):
+    def get_last_temporary_movements(self, board_id: int) -> (TileMovement | None):
         """
         Elimina la lista de movimientos temporales de un tablero.
         Args:
@@ -190,7 +190,7 @@ class BoardService:
             raise NoResultFound("Board not found with id {board_id}")
 
     def get_formed_figures(self, board_id: int) -> List[Figure]:
-  
+
         board_table = self.get_board_table(board_id)
         board_figures = find_board_figures(Board(board_table), ALL_FIGURES)
 
@@ -205,7 +205,7 @@ class BoardService:
         logger.info("Figures coordinates found: \n" + str_to_log)
 
         return board_figures
-    
+
     def delete_temporary_movement(self, tile_movement: TileMovement) -> None:
         """
         Elimina un movimiento temporal de la base de datos.

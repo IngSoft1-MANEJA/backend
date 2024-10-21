@@ -1,11 +1,10 @@
 from typing import List
 from pytest import Session
-from .enums import Colors, HardShapes, EasyShapes, Movements, MatchState
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates, DeclarativeBase
 from sqlalchemy import String, Integer, Boolean, ForeignKey
-from app.utils.utils import VALID_SHAPES
 
-# ================================================ MATCHES MODELS =================================#
+from app.utils.utils import VALID_SHAPES
+from app.models.enums import Colors, HardShapes, EasyShapes, Movements, MatchState
 
 
 class Base(DeclarativeBase):
@@ -122,17 +121,17 @@ class TileMovement:
 
 
 class Boards(Base):
-    """
-        Model of the Boards table in the database.
+    """Model of the Boards table in the database.
         Attributes:
-            - id: int, primary key.
-            - ban_color: str, color banned in the match.
-            - match_id: int, foreign key to the match.
-            - current_player_turn: int, foreign key to the current player's turn.
-            - next_player_turn: int, foreign key to the next player's turn.
+            id: int, primary key.
+            ban_color: str, color banned in the match.
+            match_id: int, foreign key to the match.
+            current_player_turn: int, foreign key to the current player's turn.
+            next_player_turn: int, foreign key to the next player's turn.
+
         Relationships:
-            - match: Matches, relationship to the match the board is in.
-            - tiles: List[Tiles], relationship to the tiles in the board.
+            match: Matches, relationship to the match the board is in.
+            tiles: List[Tiles], relationship to the tiles in the board.
     """
     __tablename__ = 'boards'
     __table_args__ = {'extend_existing': True}
@@ -173,16 +172,16 @@ class Boards(Base):
 
 
 class Tiles(Base):
-    """
-        Model of the Tiles table in the database.
+    """Model of the Tiles table in the database.
         Attributes:
-            - id: int, primary key.
-            - color: str, color of the tile.
-            - positionX: int, x position of the tile.
-            - positionY: int, y position of the tile.
-            - board_id: int, foreign key to the board.
+            id: int, primary key.
+            color: str, color of the tile.
+            positionX: int, x position of the tile.
+            positionY: int, y position of the tile.
+            board_id: int, foreign key to the board.
+
         Relationships:
-            - board: Boards, relationship to the board the tile is in.
+            board: Boards, relationship to the board the tile is in.
     """
     __tablename__ = 'tiles'
     __table_args__ = {'extend_existing': True}
@@ -220,17 +219,17 @@ class Tiles(Base):
 
 
 class ShapeCards(Base):
-    """
-        Model of the ShapeCards table in the database.
+    """Model of the ShapeCards table in the database.
         Attributes:
-            - id: int, primary key.
-            - shape_type: str, shape of the card.
-            - is_hard: bool, if the card is hard.
-            - is_visible: bool, if the card is visible.
-            - is_blocked: bool, if the card is blocked.
-            - player_owner: int, foreign key to the player that owns the card.
+            id: int, primary key.
+            shape_type: str, shape of the card.
+            is_hard: bool, if the card is hard.
+            is_visible: bool, if the card is visible.
+            is_blocked: bool, if the card is blocked.
+            player_owner: int, foreign key to the player that owns the card.
+
         Relationships:
-            - owner: Players, relationship to the player that owns the card.
+            owner: Players, relationship to the player that owns the card.
     """
     __tablename__ = 'shapeCards'
     __table_args__ = {'extend_existing': True}
