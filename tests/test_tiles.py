@@ -1,18 +1,36 @@
-from app.models.models import Tiles
+import pytest
+from sqlalchemy.orm import sessionmaker
+
+from app.database import init_db, delete_db, Init_Session, engine
+from app.models import Tiles
 from app.cruds.tile import TileService
 import app.exceptions as e
-import pytest
 
-def test_create_tile_valid(tile_service : TileService, db_session):
-    currently = db_session.query(Tiles).count()
-    tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)
-    assert db_session.query(Tiles).count() == currently + 1
+Session = sessionmaker(bind=engine)
 
-def test_create_tile_invalid_color(tile_service : TileService):
+@pytest.fixture
+def session():
+    # Creo las tablas
+    init_db()
+    session = Session()
+    yield session
+    session.close()
+    delete_db()
+    
+@pytest.fixture
+def tile_service(session):
+    return TileService(session)
+
+def test_create_tile_valid(tile_service : TileService, session):
+    currently = session.query(Tiles).count()
+    tile = tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)
+    assert session.query(Tiles).count() == currently + 1
+
+def test_create_tile_invalid_color(tile_service : TileService, session):
     with pytest.raises(e.ColorNotValid):
         tile_service.create_tile(board_id=1, color="black", position_x=1, position_y=1)
         
-def test_create_tile_invalid_position(tile_service : TileService):
+def test_create_tile_invalid_position(tile_service : TileService, session):
     with pytest.raises(e.TilePositionIsInvalid):
         tile_service.create_tile(board_id=1, color="red", position_x=-1, position_y=1)
     with pytest.raises(e.TilePositionIsInvalid):
@@ -22,22 +40,22 @@ def test_create_tile_invalid_position(tile_service : TileService):
     with pytest.raises(e.TilePositionIsInvalid):
         tile_service.create_tile(board_id=1, color="red", position_x=6, position_y=3)
 
-def test_get_all_tiles_empty(tile_service : TileService, db_session):
-    assert db_session.query(Tiles).count() == 0
+def test_get_all_tiles_empty(tile_service : TileService, session):
+    assert session.query(Tiles).count() == 0
     with pytest.raises(e.NoTilesFound):
         tile_service.get_all_tiles()
 
-def test_get_all_tiles(tile_service : TileService, db_session):
-    before = db_session.query(Tiles).count() 
-    tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)
-    expected = db_session.query(Tiles).count()
+def test_get_all_tiles(tile_service : TileService, session):
+    before = session.query(Tiles).count() 
+    tile1 = tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)
+    expected = session.query(Tiles).count()
     assert expected == before + 1
-    before = db_session.query(Tiles).count() 
-    tile_service.create_tile(board_id=2, color="green", position_x=2, position_y=2)
-    expected2 = db_session.query(Tiles).count()
+    before = session.query(Tiles).count() 
+    tile2 = tile_service.create_tile(board_id=2, color="green", position_x=2, position_y=2)
+    expected2 = session.query(Tiles).count()
     assert expected2 == before + 1
     
-def test_get_tile_by_id_valid(tile_service : TileService):
+def test_get_tile_by_id_valid(tile_service : TileService, session):
     tile1 = tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)
     assert tile_service.get_tile_by_id(tile_id=1).color == tile1.color
     assert tile_service.get_tile_by_id(tile_id=1).position_x == tile1.position_x
@@ -50,20 +68,20 @@ def test_get_tile_by_id_valid(tile_service : TileService):
     assert tile_service.get_tile_by_id(tile_id=1).position_x == tile1.position_x
     assert tile_service.get_tile_by_id(tile_id=1).position_y == tile1.position_y
     
-def test_get_tile_by_id_invalid(tile_service : TileService):
+def test_get_tile_by_id_invalid(tile_service : TileService, session):
     with pytest.raises(e.TileNotFound):
         tile_service.get_tile_by_id(tile_id=1)
 
-def test_update_tile_position_valid(tile_service, db_session):
+def test_update_tile_position_valid(tile_service, session):
     tile = tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)
-    assert db_session.query(Tiles).filter(Tiles.id == tile.id).one().position_x == 1
-    assert db_session.query(Tiles).filter(Tiles.id == tile.id).one().position_y == 1
+    assert session.query(Tiles).filter(Tiles.id == tile.id).one().position_x == 1
+    assert session.query(Tiles).filter(Tiles.id == tile.id).one().position_y == 1
     tile_service.update_tile_position(tile_id=tile.id, position_x=2, position_y=2)
-    updated_tile = db_session.query(Tiles).filter(Tiles.id == tile.id).one()
+    updated_tile = session.query(Tiles).filter(Tiles.id == tile.id).one()
     assert updated_tile.position_x == 2
     assert updated_tile.position_y == 2
     
-def test_update_tile_position_invalid(tile_service : TileService):
+def test_update_tile_position_invalid(tile_service : TileService, session):
     tile = tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)
     with pytest.raises(e.TilePositionIsInvalid):
         tile_service.update_tile_position(tile_id=tile.id, position_x=-1, position_y=1)
@@ -74,11 +92,11 @@ def test_update_tile_position_invalid(tile_service : TileService):
     with pytest.raises(e.TilePositionIsInvalid):
         tile_service.update_tile_position(tile_id=tile.id, position_x=6, position_y=3)
         
-def test_delete_tile (tile_service : TileService, db_session):
+def test_delete_tile (tile_service : TileService, session):
     tile = tile_service.create_tile(board_id=1, color="red", position_x=1, position_y=1)
-    before = db_session.query(Tiles).count()
+    before = session.query(Tiles).count()
     tile_service.delete_tile(tile_id=1)
-    expected = db_session.query(Tiles).count()
+    expected = session.query(Tiles).count()
     assert expected == before - 1
     with pytest.raises(e.TileNotFound):
         tile_service.get_tile_by_id(tile_id=1)
