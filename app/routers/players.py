@@ -13,6 +13,9 @@ from app.cruds.movement_card import MovementCardService
 from app.cruds.player import PlayerService
 from app.cruds.shape_card import ShapeCardService
 from app.cruds.tile import TileService
+from app.cruds.board import BoardService
+from app.cruds.shape_card import ShapeCardService
+from app.connection_manager import manager
 from app.database import get_db
 from app.exceptions import *
 from app.logger import logging
@@ -57,7 +60,36 @@ async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     except RuntimeError as e:
         # Manejar el caso en que el WebSocket ya esté cerrado
         print(f"Error al enviar mensaje: {e}")
+     
 
+
+async def player_winner_by_no_shapes(player_winner: Players, match: Matches, db: Session):
+    """
+        Esta funcion maneja el caso en el que un jugador gana por no tener mas 
+        figuras
+        Args:
+            - player_winner: Jugador ganador
+            - match: Partida
+            - db: Session de la base de datos
+        Returns:
+            - None, notifica a los jugadores que el jugador ha ganado
+    """   
+    cant_shapes = len(ShapeCardService(db).get_shape_card_by_player(player_winner.id))
+    
+    if cant_shapes == 0:
+        msg_win = {
+            "key" : "WINNER",
+            "payload": {
+                "player_id": player_winner.id,
+                "reason": "NORMAL"
+            }
+        }
+        PlayerService(db).delete_player(player_winner.id)
+        MatchService(db).update_match(match.id, "FINISHED", 0)
+        try:
+            await manager.broadcast_to_game(match.id, msg_win)
+        except RuntimeError as e:
+            print(f"Error al enviar mensaje: {e}")
 
 def end_turn_logic(player: Players, match: Matches, db: Session):
     match_service = MatchService(db)
@@ -569,7 +601,6 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
                 tile2.id, aux_tile.position_x, aux_tile.position_y)
 
         shape_card_service.delete_shape_card(request.figure_id)
-
         for _ in board.temporary_movements:
             last_movement = board_service.get_last_temporary_movements(
                 board.id)
@@ -590,6 +621,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     }
     await manager.broadcast_to_game(match_id, msg2)
     await asyncio.sleep(1)
+    await player_winner_by_no_shapes(player, match, db)        
 
     figures_found = board_service.get_formed_figures(board.id)
 
