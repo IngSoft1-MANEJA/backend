@@ -1,4 +1,5 @@
 import copy
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
@@ -199,6 +200,10 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
 @router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
 async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
+    movement_card_service = MovementCardService(db)
+    board_service = BoardService(db)
+    tile_service = TileService(db)
+    
     try:
         player = PlayerService(db).get_player_by_id(player_id)
     except:
@@ -207,11 +212,52 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         match = MatchService(db).get_match_by_id(match_id)
     except:
         raise HTTPException(status_code=404, detail=f"Match not found")
+    try:
+        board = board_service.get_board_by_match_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Board not found")
 
+    movements = []
+    tiles = []
+    for _ in range(len(board.temporary_movements)):
+        try:
+            last_movement = board_service.get_last_temporary_movements(
+                board.id)
+        except NoResultFound as e:
+            raise HTTPException(status_code=404, detail=e)
+    
+        tile1 = last_movement.tile1
+        tile2 = last_movement.tile2
+
+        try:
+            movement = movement_card_service.get_movement_card_by_id(
+                last_movement.id_mov)
+            movement_card_service.add_movement_card_to_player(player_id, movement.id)
+        except NoResultFound as e:
+            raise HTTPException(status_code=404, detail=e)
+        
+        movements.append((movement.id, movement.mov_type))
+        tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
+        "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+        aux_tile = copy.copy(tile1)
+        
+        try:
+            tile_service.update_tile_position(
+                tile1.id, tile2.position_x, tile2.position_y)
+            tile_service.update_tile_position(
+                tile2.id, aux_tile.position_x, aux_tile.position_y)
+        except NoResultFound as e:
+            raise HTTPException(status_code=404, detail=e)
+        
+        await asyncio.sleep(1)
+        msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
+        await manager.broadcast_to_game(match_id, msg)
+            
+    
     next_player = end_turn_logic(player, match, db)
-    movs = give_movement_card_to_player(player_id, db)
+    movements += give_movement_card_to_player(player_id, db)
 
-    await notify_movement_card_to_player(player_id, match_id, movs)
+    await notify_movement_card_to_player(player_id, match_id, movements)
     await notify_all_players_movements_received(player, match)
     await give_shape_card_to_player(player.id, db, is_init=False)
 
