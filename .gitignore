@@ -13,12 +13,6 @@
 # .nfs files are created when an open file is removed but is still being accessed
 .nfs*
 
-### Visual Studio Code ###
-.vscode
-
-### Database ###
-*.sqlite
-
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
