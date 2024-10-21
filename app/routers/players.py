@@ -1,28 +1,38 @@
-import copy
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import NoResultFound
-from sqlalchemy import select
+import copy
 
-from app.cruds.movement_card import MovementCardService
-from app.cruds.shape_card import ShapeCardService
-from app.exceptions import *
-from app.cruds.match import MatchService
-from app.cruds.player import PlayerService
-from app.cruds.tile import TileService
-from app.cruds.board import BoardService
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.exc import NoResultFound
+from sqlalchemy.orm import Session
+
 from app.connection_manager import manager
+from app.cruds.board import BoardService
+from app.cruds.match import MatchService
+from app.cruds.movement_card import MovementCardService
+from app.cruds.player import PlayerService
+from app.cruds.shape_card import ShapeCardService
+from app.cruds.tile import TileService
 from app.database import get_db
+from app.exceptions import *
+from app.logger import logging
 from app.models import enums
 from app.models.enums import EasyShapes, HardShapes, ReasonWinning
-from app.models.models import Players, Matches, ShapeCards
-from app.routers.matches import give_movement_card_to_player, give_shape_card_to_player, notify_all_players_movements_received, notify_movement_card_to_player
+from app.models.models import Matches, Players, ShapeCards
+from app.routers.matches import (give_movement_card_to_player,
+                                 give_shape_card_to_player,
+                                 notify_all_players_movements_received,
+                                 notify_movement_card_to_player)
 from app.schemas import PartialMove, UseFigure
-from app.utils.board_shapes_algorithm import Figure, translate_shape_to_bottom_left
-from app.utils.utils import validate_diagonal, validate_inverse_diagonal, validate_line, validate_line_between, validate_inverse_l, validate_l, validate_line_border, FIGURE_COORDINATES
-from app.logger import logging
-from app.utils.board_shapes_algorithm import rotate_90_degrees, rotate_180_degrees, rotate_270_degrees, Coordinate
+from app.utils.board_shapes_algorithm import (Coordinate, Figure,
+                                              rotate_90_degrees,
+                                              rotate_180_degrees,
+                                              rotate_270_degrees,
+                                              translate_shape_to_bottom_left)
+from app.utils.utils import (FIGURE_COORDINATES, validate_diagonal,
+                             validate_inverse_diagonal, validate_inverse_l,
+                             validate_l, validate_line, validate_line_between,
+                             validate_line_border)
 
 logger = logging.getLogger(__name__)
 
@@ -567,8 +577,10 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
         raise HTTPException(status_code=404, detail="Tile not found")
 
     if tiles:
-        msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
-        await manager.broadcast_to_game(match_id, msg)
+        for tiles_to_swap in tiles:
+            msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles_to_swap}}
+            await manager.broadcast_to_game(match_id, msg)
+            await asyncio.sleep(1)
 
     msg2 = {
         "key": "COMPLETED_FIGURE",
@@ -577,5 +589,15 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
         }
     }
     await manager.broadcast_to_game(match_id, msg2)
+    await asyncio.sleep(1)
+
+    figures_found = board_service.get_formed_figures(board.id)
+
+    allow_figures_event = {
+        "key": "ALLOW_FIGURES",
+        "payload": figures_found
+    }
+
+    await manager.broadcast_to_game(match_id, allow_figures_event)
 
     return {"movement_cards": movements}
