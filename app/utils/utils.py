@@ -1,4 +1,3 @@
-import re
 import app.exceptions as e
 from app.models.enums import *
 from app.schemas import Tile
@@ -13,7 +12,7 @@ MAX_PLAYERS = 4
 # Defino tamaño máximo del tablero
 BOARD_SIZE_X = 6
 BOARD_SIZE_Y = 6
-
+BOARD_SIZE = (BOARD_SIZE_X, BOARD_SIZE_Y)
 MAX_SHAPE_CARDS = 50
 
 # Definir colores válidos para el ban

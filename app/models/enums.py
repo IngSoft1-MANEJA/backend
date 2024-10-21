@@ -1,4 +1,7 @@
 import enum
+from app.logger import logging
+
+logger = logging.getLogger(__name__)
 
 class HardShapes(enum.Enum):
     T_90 = 1

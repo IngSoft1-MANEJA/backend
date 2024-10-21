@@ -14,12 +14,14 @@ from app.cruds.board import BoardService
 from app.connection_manager import manager
 from app.database import get_db
 from app.models import enums
-from app.models.enums import ReasonWinning
-from app.models.models import Players, Matches
+from app.models.enums import EasyShapes, HardShapes, ReasonWinning
+from app.models.models import Players, Matches, ShapeCards
 from app.routers.matches import give_movement_card_to_player, give_shape_card_to_player, notify_all_players_movements_received, notify_movement_card_to_player
 from app.schemas import PartialMove, UseFigure
-from app.utils.utils import validate_diagonal, validate_inverse_diagonal, validate_line, validate_line_between, validate_inverse_l, validate_l, validate_line_border
+from app.utils.board_shapes_algorithm import Figure, translate_shape_to_bottom_left
+from app.utils.utils import validate_diagonal, validate_inverse_diagonal, validate_line, validate_line_between, validate_inverse_l, validate_l, validate_line_border, FIGURE_COORDINATES
 from app.logger import logging
+from app.utils.board_shapes_algorithm import rotate_90_degrees, rotate_180_degrees, rotate_270_degrees, Coordinate
 
 logger = logging.getLogger(__name__)
 
@@ -433,7 +435,7 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
 
 
 @router.post("/{match_id}/player/{player_id}/use-figure", status_code=200)
-async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session = Depends(get_db)):
+async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
     shape_card_service = ShapeCardService(db)
@@ -456,17 +458,29 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
             status_code=403, detail=f"It's not player {player.player_name}'s turn")
 
     try:
-        shape_card = shape_card_service.get_shape_card_by_id(body.figure_id)
+        shape_card = shape_card_service.get_shape_card_by_id(request.figure_id)
+
         if not shape_card.is_visible or shape_card.player_owner != player_id:
             raise HTTPException(
-                status_code=404, detail="Shape Card doesn't belong to Player")
+                status_code=404, detail="Figure card doesn't belong to Player")
     except NoResultFound:
-        raise HTTPException(status_code=404, detail="Shape Card not found")
+        raise HTTPException(status_code=404, detail="Figure Card not found")
 
-    # TODO validar las coordenadas correspondan a la figura
+    valid_coordinates = FIGURE_COORDINATES[shape_card.shape_type.name]
+    all_valid_rotations = [valid_coordinates, rotate_90_degrees(valid_coordinates, (6, 6)), rotate_180_degrees(
+        valid_coordinates, (6, 6)), rotate_270_degrees(valid_coordinates, (6, 6))]
 
     try:
         board = board_service.get_board_by_id(match.board.id)
+
+        figures_found = board_service.get_formed_figures(board.id)
+        coordinates = request.coordinates
+        figure_to_find = Figure(translate_shape_to_bottom_left(
+            Figure(tuple(map(lambda x: Coordinate(x[0], x[1]), coordinates))), (6,6)))
+
+        if not figure_to_find in figures_found or not figure_to_find in all_valid_rotations:
+            raise HTTPException(
+                status_code=409, detail="Conflict with coordinates and Figure Card")
 
         movements = []
         tiles = []
@@ -474,7 +488,6 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
             last_movement = board_service.get_last_temporary_movements(
                 board.id)
             if last_movement.create_figure:
-                shape_card_service.delete_shape_card(body.figure_id)
                 break
             tile1 = last_movement.tile1
             tile2 = last_movement.tile2
@@ -493,12 +506,11 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
             tile_service.update_tile_position(
                 tile2.id, aux_tile.position_x, aux_tile.position_y)
 
+        shape_card_service.delete_shape_card(request.figure_id)
+
         for _ in board.temporary_movements:
             last_movement = board_service.get_last_temporary_movements(
                 board.id)
-
-    except HTTPException as e:
-        raise e
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
 
@@ -509,7 +521,7 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
     msg2 = {
         "key": "COMPLETED_FIGURE",
         "payload": {
-            "figure_id": body.figure_id
+            "figure_id": request.figure_id
         }
     }
     await manager.broadcast_to_game(match_id, msg2)
