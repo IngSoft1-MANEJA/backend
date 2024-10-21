@@ -601,7 +601,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
                 tile2.id, aux_tile.position_x, aux_tile.position_y)
 
         shape_card_service.delete_shape_card(request.figure_id)
-
+        player_winner_by_no_shapes(player, match, db)        
         for _ in board.temporary_movements:
             last_movement = board_service.get_last_temporary_movements(
                 board.id)
