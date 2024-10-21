@@ -1,4 +1,7 @@
 import enum
+from app.logger import logging
+
+logger = logging.getLogger(__name__)
 
 class HardShapes(enum.Enum):
     T_90 = 1
@@ -52,3 +55,9 @@ class MatchState(enum.Enum):
 class ReasonWinning(enum.Enum):
     NORMAL = "NORMAL"
     FORFEIT = "FORFEIT"
+    
+def get_enum_name(enum_class, value):
+    for name, member in enum_class.__members.items():
+        if member.value == value:
+            return name
+    return None

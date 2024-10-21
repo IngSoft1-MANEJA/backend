@@ -6,7 +6,7 @@ from random import shuffle
 
 from app.cruds.tile import TileService
 from app.models.enums import Colors
-from app.models.models import Boards, Tiles
+from app.models.models import Boards, Tiles, TileMovement
 from app.utils.board_shapes_algorithm import *
 from app.utils.utils import FIGURE_COORDINATES, validate_color, validate_turn, validate_board, ALL_FIGURES
 from app.logger import logging
@@ -144,7 +144,7 @@ class BoardService:
         except NoResultFound:
             raise NoResultFound("Board not found with match_id {match_id}")
 
-    def update_list_of_parcial_movements(self, board_id: int, list_of_parcial_movements: List[Tiles], id_mov: int):
+    def update_list_of_parcial_movements(self, board_id: int, list_of_parcial_movements: List[Tiles], id_mov: int, create_figure: bool):
         """
         Actualiza la lista de movimientos parciales de un tablero.
         Args:
@@ -154,7 +154,7 @@ class BoardService:
         try:
             board = self.db.query(Boards).filter(Boards.id == board_id).one()
             board.add_temporary_movement(
-                list_of_parcial_movements[0], list_of_parcial_movements[1], id_mov)
+                list_of_parcial_movements[0], list_of_parcial_movements[1], id_mov, create_figure)
             self.db.commit()
 
         except NoResultFound:
@@ -205,3 +205,16 @@ class BoardService:
         logger.info("Figures coordinates found: \n" + str_to_log)
 
         return board_figures
+    
+    def delete_temporary_movement(self, tile_movement: TileMovement) -> None:
+        """
+        Elimina un movimiento temporal de la base de datos.
+        Args:
+            tile_movement_id: Id del movimiento temporal.
+        """
+        self.db.delete(tile_movement)
+        self.db.commit()
+
+    def clear_temporary_movements(self, tile_movements: list[TileMovement]) -> None:
+        self.db.delete(tile_movements)
+        self.db.commit()

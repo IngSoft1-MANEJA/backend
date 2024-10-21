@@ -1,4 +1,5 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 from random import shuffle, randint
@@ -60,13 +61,35 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
 
 
 @router.get("/", response_model=list[MatchOut])
-def get_matches(db: Session = Depends(get_db)):
-    try:
-        match_service = MatchService(db)
-        matches = match_service.get_all_matches(available=True)
+def get_matches(
+    s: Optional[str] = Query(None, max_length=50),
+    max_players: Optional[int] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+        Obtiene todas las partidas que coincidan con los filtros, si no tiene
+        filtros devuelve todas las partidas disponibles.
+        Args:
+            - s : string a buscar en el nombre de la partida.
+            - max_players : cantidad máxima de jugadores en la partida.
+            - db : Session de la base de datos.
+        Returns:
+            - Lista de partidas en esquema MatchOut.
+    """
+    matches = MatchService(db).get_all_matches(True)
+
+    if not s and not max_players:
         return matches
-    except:
-        raise HTTPException(status_code=404, detail="No matches found")
+
+    filtered_matches = matches
+    if s:
+        filtered_matches = [
+            match for match in filtered_matches if s in match.match_name]
+    if max_players:
+        filtered_matches = [
+            match for match in filtered_matches if match.max_players == max_players]
+
+    return filtered_matches
 
 
 @router.get("/{match_id}", response_model=MatchOut)
@@ -128,7 +151,7 @@ def create_movement_deck(db: Session, match_id: int):
             movement_service.create_movement_card(mov.value, match_id)
 
 
-def give_movement_card_to_player(player_id: int, db: Session):
+def give_movement_card_to_player(player_id: int, db: Session) -> list[tuple[int, str]]:
     """
     Da hasta 3 cartas de movimiento al jugador.
     Args:
@@ -213,7 +236,7 @@ async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
 
     if not is_init:
         msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
-                   "payload": {"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}}
+                   "payload": [{"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}]}
         await manager.broadcast_to_game(player.match_id, msg_all)
 # =============================================================================================================
 

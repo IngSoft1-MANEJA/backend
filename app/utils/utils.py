@@ -1,4 +1,3 @@
-import re
 import app.exceptions as e
 from app.models.enums import *
 from app.schemas import Tile
@@ -13,7 +12,7 @@ MAX_PLAYERS = 4
 # Defino tamaño máximo del tablero
 BOARD_SIZE_X = 6
 BOARD_SIZE_Y = 6
-
+BOARD_SIZE = (BOARD_SIZE_X, BOARD_SIZE_Y)
 MAX_SHAPE_CARDS = 50
 
 # Definir colores válidos para el ban
@@ -92,7 +91,7 @@ def validate_movement(movement: str):
 
 def validate_add_shape_card_to_hand(player_id: int, count_cards: int):
     if count_cards > 3:
-        raise e.HandIsFull(player_id)
+        raise e.ShapeCardHandIsFull(player_id)
 
 
 def validate_turn(current_player: int, next_player_turn: int, board_id: int):
