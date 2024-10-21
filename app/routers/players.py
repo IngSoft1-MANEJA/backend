@@ -475,12 +475,6 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
                 board.id)
             if last_movement.create_figure:
                 shape_card_service.delete_shape_card(body.figure_id)
-                msg2 = {
-                    "key": "COMPLETED_FIGURE",
-                    "payload": {
-                        "figure_id": body.figure_id
-                    }
-                }
                 break
             tile1 = last_movement.tile1
             tile2 = last_movement.tile2
@@ -512,6 +506,12 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
         msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
         await manager.broadcast_to_game(match_id, msg)
 
+    msg2 = {
+        "key": "COMPLETED_FIGURE",
+        "payload": {
+            "figure_id": body.figure_id
+        }
+    }
     await manager.broadcast_to_game(match_id, msg2)
 
-    return {"movement_card": movements}
+    return {"movement_cards": movements}
