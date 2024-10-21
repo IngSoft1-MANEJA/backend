@@ -1,22 +1,15 @@
 import pytest
-from fastapi.testclient import TestClient
 from fastapi import status, HTTPException
 from unittest.mock import call, patch, MagicMock, AsyncMock
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm.session import Session
 
-from app.main import app
-from app.routers.players import playerWinner
 from app.models.enums import EasyShapes, ReasonWinning
 from app.schemas import PartialMove, Tile
 from app.exceptions import PlayerNotConnected
 from app.routers.players import validate_partial_move
-from app.models.enums import MatchState
-from app.logger import logging
 from app.utils.board_shapes_algorithm import rotate_90_degrees, rotate_180_degrees, rotate_270_degrees
 from app.utils.utils import FIGURE_COORDINATES
-
-# client = TestClient(app)
 
 
 @pytest.fixture(scope="function")
