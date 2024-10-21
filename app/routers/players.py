@@ -441,7 +441,6 @@ async def use_figure(match_id: int, player_id: int, body: UseFigure, db: Session
     tile_service = TileService(db)
     movement_card_service = MovementCardService(db)
 
-    logger.info(body)
     try:
         match = match_service.get_match_by_id(match_id)
     except NoResultFound:
