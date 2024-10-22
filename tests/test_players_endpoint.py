@@ -461,8 +461,8 @@ def test_use_figure_without_use_movements(setup_mocks, client, setup_mocks2):
     response = client.post("/matches/1/player/1/use-figure",
                            json={"figure_id": 1, "coordinates": [[0, 1], [0, 2], [0, 3], [0, 4]]})
     print(response.json())
-    assert (response.status_code == 200)
-    assert (response.json() == {"movement_cards": []})
+    assert (response.status_code == 409)
+    assert (response.json() == {"detail": "Conflict with coordinates and Figure Card"}) 
 
 
 def test_use_figure_with_movement_return(setup_mocks, client, setup_mocks2):
@@ -488,5 +488,5 @@ def test_use_figure_with_movement_return(setup_mocks, client, setup_mocks2):
     response = client.post("/matches/1/player/1/use-figure",
                            json={"figure_id": 1, "coordinates": [[0, 1], [0, 2], [0, 3], [0, 4]]})
     print(response.json())
-    assert (response.status_code == 200)
-    assert (response.json() == {"movement_cards": [[1,1]]})
+    assert (response.status_code == 409)
+    assert (response.json() == {"detail": "Conflict with coordinates and Figure Card"}) 
