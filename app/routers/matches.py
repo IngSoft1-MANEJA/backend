@@ -313,6 +313,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
         player = PlayerService(db).get_player_by_id(player_id)
         board_table = BoardService(db).get_board_table(match.board.id)
         players_in_match = PlayerService(db).get_players_by_match(match_id)
+        deck_size = ShapeCardService(db).get_deck_size(player_id)
     except Exception as e:
         print(f"Error al obtener informacion de la partida: {e}")
         raise HTTPException(
@@ -326,6 +327,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
             "turn_order": player.turn_order,
             "board": board_table,
             "current_turn_player": current_player.player_name,
+            "deck_size": deck_size,
             "opponents": [
                 {
                     "player_name": opponent.player_name,
