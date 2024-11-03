@@ -1,5 +1,7 @@
-from typing import Optional
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from typing import Optional, Annotated
+from fastapi import (APIRouter, Query, WebSocket, WebSocketDisconnect, Depends, 
+                     HTTPException, Security)
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 from random import shuffle, randint
@@ -23,6 +25,7 @@ from app.utils.board_shapes_algorithm import Figure, find_board_figures, Board
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 @router.websocket("/{game_id}/ws/{player_id}")
@@ -293,7 +296,10 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
 
 @router.get("/{match_id}/player/{player_id}")
-async def get_match_info_to_player(match_id: int, player_id: int, db: Session = Depends(get_db)):
+async def get_match_info_to_player(match_id: int, player_id: int, 
+                                   token: Annotated[str, Depends(oauth2_scheme)],
+                                   db: Session = Depends(get_db)
+                                   ):
     """
         Devuelve informacion de la partida al jugador:
             - Tablero con sus fichas
@@ -311,56 +317,62 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
     try:
         match = MatchService(db).get_match_by_id(match_id)
         player = PlayerService(db).get_player_by_id(player_id)
-        board_table = BoardService(db).get_board_table(match.board.id)
-        players_in_match = PlayerService(db).get_players_by_match(match_id)
     except Exception as e:
-        print(f"Error al obtener informacion de la partida: {e}")
-        raise HTTPException(
-            status_code=404, detail="Error al obtener informacion de la partida")
+        raise HTTPException(status_code=404, detail="Error al obtener información de la partida")
 
-    current_player = PlayerService(db).get_player_by_turn(
-        match.current_player_turn, match_id)
-    msg_info = {
-        "key": "GET_PLAYER_MATCH_INFO",
-        "payload": {
-            "turn_order": player.turn_order,
-            "board": board_table,
-            "current_turn_player": current_player.player_name,
-            "opponents": [
-                {
-                    "player_name": opponent.player_name,
-                    "turn_order": opponent.turn_order
-                }
-                for opponent in players_in_match
-                if opponent.id != player_id
-            ]
+    if match.state == "NOT_STARTED":
+        players_in_match = PlayerService(db).get_players_by_match(match_id)
+        response = {
+            "key": "MATCH_INFO",
+            "payload": {
+                "state": "NOT_STARTED",
+                "players": [
+                    {"id": p.id, "name": p.name, "is_owner": p.is_owner}
+                    for p in players_in_match
+                ],
+                "is_owner": player.is_owner,
+                "player_id": player.id,
+                "player_name": player.name
+            }
         }
-    }
-    await manager.send_to_player(match_id, player_id, msg_info)
+    else:
+        board_table = BoardService(db).get_board_table(match.board.id)
+        current_player = PlayerService(db).get_player_by_turn(match.current_player_turn, match_id)
+        s_service = ShapeCardService(db)
+        m_service = MovementCardService(db)
 
-    # Se le envian las cartas de movimiento y figuras
-    s_service = ShapeCardService(db)
-    m_service = MovementCardService(db)
+        player_shapes = s_service.get_visible_cards(player_id, True)
+        player_movements = m_service.get_movement_card_by_user(player_id)
 
-    payload_list = []
-    for player_i in players_in_match:
-        shapes_p = s_service.get_visible_cards(player_i.id, True)
-        all_shapes = [(shape.id, shape.shape_type) for shape in shapes_p]
+        players_info = [
+            {
+                "id": p.id,
+                "name": p.name,
+                "turn_order": p.turn_order,
+                "shape_cards": s_service.get_visible_cards(p.id, True)
+            }
+            for p in PlayerService(db).get_players_by_match(match_id)
+        ]
 
-        payload = {"turn_order": player_i.turn_order,
-                   "shape_cards": all_shapes}
-        payload_list.append(payload)
+        response = {
+            "key": "MATCH_INFO",
+            "payload": {
+                "state": "STARTED",
+                "board": board_table,
+                "current_turn_player": current_player.player_name,
+                "player": {
+                    "id": player.id,
+                    "name": player.name,
+                    "turn_order": player.turn_order,
+                    "is_owner": player.is_owner,
+                    "shape_cards": player_shapes,
+                    "movement_cards": player_movements
+                },
+                "players": players_info
+            }
+        }
 
-    msg_shapes = {
-        "key": "PLAYER_RECIEVE_ALL_SHAPES",
-        "payload": payload_list
-    }
-
-    await manager.send_to_player(match_id, player_id, msg_shapes)
-
-    movements = m_service.get_movement_card_by_user(player_id)
-    all_movements = [(mov.id, mov.mov_type) for mov in movements]
-    await notify_movement_card_to_player(player_id, match_id, all_movements)
+    await manager.send_to_player(match_id, player_id, response)
 
     # Send Info about figures coordinates
     try:
