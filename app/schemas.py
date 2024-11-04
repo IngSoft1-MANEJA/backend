@@ -25,6 +25,7 @@ class MatchCreateOut(MatchOut):
 
 class PlayerJoinIn(BaseModel):
     player_name: str
+    token: str # Agrego token al join para identitficar al jugador
 
 
 class PlayerJoinOut(BaseModel):
