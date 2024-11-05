@@ -128,7 +128,7 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
             raise HTTPException(status_code=404, detail="Match is full")
         player_service = PlayerService(db)
         player = player_service.create_player(
-            playerJoinIn.player_name, match_id, False, "123")
+            playerJoinIn.player_name, match_id, False, playerJoinIn.token)
         match.current_players = match.current_players + 1
         players = [player.player_name for player in match.players]
         db.commit()
@@ -294,7 +294,100 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Match not found")
 
+# ================================== Auxiliares para obtener informacion de la partida ==============================
+async def send_shape_cards_info(match_id: int, player_id: int, 
+                                players_in_match:list, 
+                                s_service: ShapeCardService):
+    payload_list = []
+    for player_i in players_in_match:
+        shapes_p = s_service.get_visible_cards(player_i.id, True)
+        all_shapes = [(shape.id, shape.shape_type) for shape in shapes_p]
 
+        payload = {"turn_order": player_i.turn_order,
+                   "shape_cards": all_shapes}
+        payload_list.append(payload)
+
+    msg_shapes = {
+        "key": "PLAYER_RECIEVE_ALL_SHAPES",
+        "payload": payload_list
+    }
+
+    await manager.send_to_player(match_id, player_id, msg_shapes)
+
+
+async def send_movement_cards_info(player_id: int, match_id: int, 
+                                   m_service: MovementCardService):
+    movements = m_service.get_movement_card_by_user(player_id)
+    all_movements = [(mov.id, mov.mov_type) for mov in movements]
+    await notify_movement_card_to_player(player_id, match_id, all_movements)
+
+
+async def send_figures_info(match_id: int, player_id: int, db: Session):
+    try:
+        match = MatchService(db).get_match_by_id(match_id)
+        board_figures = BoardService(db).get_formed_figures(match.board.id)
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Error with formed figures")
+
+    msg = {
+        "key": "ALLOW_FIGURES",
+        "payload": board_figures
+    }
+
+    await manager.send_to_player(match_id, player_id, msg)
+    
+    
+async def send_waiting_match_info(match_id: int, player_id: int, db: Session):
+    players_in_match = PlayerService(db).get_players_by_match(match_id)
+    player = PlayerService(db).get_player_by_id(player_id)
+    response = {
+        "key": "MATCH_INFO",
+        "payload": {
+            "state": "WAITING",
+            "players": [
+                {"id": p.id, "name": p.player_name, "is_owner": p.is_owner}
+                for p in players_in_match
+            ],
+            "is_owner": player.is_owner,
+            "player_id": player.id,
+            "player_name": player.player_name
+        }
+    }
+    await manager.send_to_player(match_id, player_id, response)
+
+
+async def send_active_match_info(match_id: int, player_id: int, db: Session):
+    s_service = ShapeCardService(db)
+    m_service = MovementCardService(db)
+    board_table = BoardService(db).get_board_table(match_id)
+    match = MatchService(db).get_match_by_id(match_id)
+    current_player = PlayerService(db).get_player_by_turn(match.current_player_turn, match_id)
+    players_in_match = PlayerService(db).get_players_by_match(match_id)
+    
+    msg_info = {
+        "key": "GET_PLAYER_MATCH_INFO",
+        "payload": {
+            "turn_order": current_player.turn_order,
+            "board": board_table,
+            "current_turn_player": current_player.player_name,
+            "opponents": [
+                {
+                    "player_name": opponent.player_name,
+                    "turn_order": opponent.turn_order
+                }
+                for opponent in players_in_match
+                if opponent.id != player_id
+            ]
+        }
+    }
+    await manager.send_to_player(match_id, player_id, msg_info)
+    
+    await send_shape_cards_info(match_id, player_id, players_in_match, s_service)
+    await send_movement_cards_info(player_id, match_id, m_service)
+    await send_figures_info(match_id, player_id, db)
+
+# =============================================================================
 @router.get("/{match_id}/player/{player_id}")
 async def get_match_info_to_player(match_id: int, player_id: int, 
                                    token: Annotated[str, Depends(oauth2_scheme)],
@@ -316,75 +409,10 @@ async def get_match_info_to_player(match_id: int, player_id: int,
     """
     try:
         match = MatchService(db).get_match_by_id(match_id)
-        player = PlayerService(db).get_player_by_id(player_id)
     except Exception as e:
         raise HTTPException(status_code=404, detail="Error al obtener información de la partida")
 
-    if match.state == "NOT_STARTED":
-        players_in_match = PlayerService(db).get_players_by_match(match_id)
-        response = {
-            "key": "MATCH_INFO",
-            "payload": {
-                "state": "NOT_STARTED",
-                "players": [
-                    {"id": p.id, "name": p.name, "is_owner": p.is_owner}
-                    for p in players_in_match
-                ],
-                "is_owner": player.is_owner,
-                "player_id": player.id,
-                "player_name": player.name
-            }
-        }
+    if match.state == "WAITING":
+        await send_waiting_match_info(match_id, player_id, db)
     else:
-        board_table = BoardService(db).get_board_table(match.board.id)
-        current_player = PlayerService(db).get_player_by_turn(match.current_player_turn, match_id)
-        s_service = ShapeCardService(db)
-        m_service = MovementCardService(db)
-
-        player_shapes = s_service.get_visible_cards(player_id, True)
-        player_movements = m_service.get_movement_card_by_user(player_id)
-
-        players_info = [
-            {
-                "id": p.id,
-                "name": p.name,
-                "turn_order": p.turn_order,
-                "shape_cards": s_service.get_visible_cards(p.id, True)
-            }
-            for p in PlayerService(db).get_players_by_match(match_id)
-        ]
-
-        response = {
-            "key": "MATCH_INFO",
-            "payload": {
-                "state": "STARTED",
-                "board": board_table,
-                "current_turn_player": current_player.player_name,
-                "player": {
-                    "id": player.id,
-                    "name": player.name,
-                    "turn_order": player.turn_order,
-                    "is_owner": player.is_owner,
-                    "shape_cards": player_shapes,
-                    "movement_cards": player_movements
-                },
-                "players": players_info
-            }
-        }
-
-    await manager.send_to_player(match_id, player_id, response)
-
-    # Send Info about figures coordinates
-    try:
-        match = MatchService(db).get_match_by_id(match_id)
-        board_figures = BoardService(db).get_formed_figures(match.board.id)
-    except Exception:
-        raise HTTPException(
-            status_code=500, detail="Error with formed figures")
-
-    msg = {
-        "key": "ALLOW_FIGURES",
-        "payload": board_figures
-    }
-
-    await manager.send_to_player(match_id, player_id, msg)
+        await send_active_match_info(match_id, player_id, db)
