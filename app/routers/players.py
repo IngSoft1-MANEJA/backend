@@ -306,6 +306,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     msg = {
         "key": "END_PLAYER_TURN",
         "payload": {
+            "current_player_turn": player.turn_order,
             "current_player_name": player.player_name,
             "next_player_name": next_player.player_name,
             "next_player_turn": next_player.turn_order
