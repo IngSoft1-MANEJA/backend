@@ -116,7 +116,7 @@ def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", status_code=200)
-def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
+async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
 
@@ -127,8 +127,10 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     manager.create_game_connection(match1.id)
 
     matches = match_service.get_all_matches(True)
+    matches = [MatchOut.model_validate(match).model_dump() 
+                   for match in matches]
     msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
-    manager.broadcast(msg)
+    await manager.broadcast(msg)
 
     return {"player_id": new_player.id, "match_id": match1.id}
 
@@ -152,8 +154,10 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
             await manager.broadcast_to_game(match_id, msg)
 
             matches = match_service.get_all_matches(True)
+            matches = [MatchOut.model_validate(match).model_dump() 
+                   for match in matches]
             msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
-            manager.broadcast(msg)
+            await manager.broadcast(msg)
         except Exception as e:
             print(f"Error al enviar mensaje: {e}")
         return {"player_id": player.id, "players": players}

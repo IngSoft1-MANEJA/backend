@@ -7,7 +7,7 @@ from app.exceptions import *
 class ConnectionManager:
     def __init__(self) -> None:
         self._games: Dict[int, Dict[int, WebSocket]] = {}
-        self._connections: List = []
+        self._connections: List[WebSocket] = []
 
     def add_anonymous_connection(self, websocket: WebSocket):
         """Add anonymous websocket to connections
@@ -38,7 +38,9 @@ class ConnectionManager:
         self._games[game_id] = {}
 
 
-    def broadcast(self, msg):
+    async def broadcast(self, msg):
+        for websocket in self._connections:
+            await websocket.send_json(msg)
         map(lambda x: x.send_json(msg), self._connections)
 
 
