@@ -645,7 +645,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
 
 
 @router.post("/{match_id}/player/{player_id}/block-figure", status_code=200)
-async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Session = Depends(get_db)):
+async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
     shape_card_service = ShapeCardService(db)
