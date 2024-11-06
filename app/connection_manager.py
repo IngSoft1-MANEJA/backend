@@ -41,7 +41,6 @@ class ConnectionManager:
     async def broadcast(self, msg):
         for websocket in self._connections:
             await websocket.send_json(msg)
-        map(lambda x: x.send_json(msg), self._connections)
 
 
     @staticmethod
