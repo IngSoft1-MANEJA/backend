@@ -16,14 +16,25 @@ from app.models.enums import *
 from app.models.models import Matches, Players
 from app.schemas import *
 from app.database import get_db
-from app.utils.utils import MAX_SHAPE_CARDS, FIGURE_COORDINATES
+from app.utils.utils import MAX_SHAPE_CARDS
 from app.logger import logging
-from app.utils.board_shapes_algorithm import Figure, find_board_figures, Board
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches")
 
+@router.websocket("/ws")
+async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    await websocket.accept()
+    try:
+        manager.add_anonymous_connection(websocket)
+        matches = match_service.get_all_matches(True)
+        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+        await websocket.send_json(msg)
+        await manager.keep_alive(websocket)
+    except WebSocketDisconnect:
+        manager.remove_anonymous_connection(websocket)
 
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket, db: Session = Depends(get_db)):
@@ -113,6 +124,10 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
         match.player_name, match1.id, True, match.token)
     manager.create_game_connection(match1.id)
 
+    matches = match_service.get_all_matches(True)
+    msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+    manager.broadcast(msg)
+
     return {"player_id": new_player.id, "match_id": match1.id}
 
 
@@ -133,6 +148,10 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
 
         try:
             await manager.broadcast_to_game(match_id, msg)
+
+            matches = match_service.get_all_matches(True)
+            msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+            manager.broadcast(msg)
         except Exception as e:
             print(f"Error al enviar mensaje: {e}")
         return {"player_id": player.id, "players": players}
