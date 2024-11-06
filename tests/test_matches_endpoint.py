@@ -291,6 +291,7 @@ async def test_get_match_info_to_player(client, db_session):
                 "turn_order": player.turn_order,
                 "board": board_table,
                 "current_turn_player": current_player.player_name,
+                "deck_size": 0,
                 "opponents": [
                     {
                         "player_name": opponent.player_name,
@@ -301,6 +302,7 @@ async def test_get_match_info_to_player(client, db_session):
                 ]
             }
         }
+
         mock_send_to_player.assert_any_call(match_id, player_id, msg_info)
 
         msg_shapes = {
