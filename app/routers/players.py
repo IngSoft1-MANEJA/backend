@@ -650,8 +650,6 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     player_service = PlayerService(db)
     shape_card_service = ShapeCardService(db)
     board_service = BoardService(db)
-    tile_service = TileService(db)
-    movement_card_service = MovementCardService(db)
 
     try:
         match = match_service.get_match_by_id(match_id)
@@ -669,14 +667,25 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
 
     try:
         shape_card = shape_card_service.get_shape_card_by_id(request.figure_id)
-
-        if not shape_card.is_visible or shape_card.player_owner not in match.current_players:
-            raise HTTPException(
-                status_code=404, detail="Figure card doesn't belong to this match")
-    
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Figure Card not found")
-    
+
+    if not shape_card.is_visible or shape_card.player_owner not in match.current_players:
+        raise HTTPException(
+            status_code=404, detail="Figure card doesn't belong to this match")
+    elif shape_card.is_blocked != "NOT BLOCKED":
+        raise HTTPException(
+            status_code=400, detail="Figure card is already blocked")
+
+    cards = shape_card_service.get_shape_card_by_player(player_id)
+    if len(cards) < 3:
+        raise HTTPException(
+            status_code=400, detail="Player must have at least 3 figure cards to block one")
+    for card in cards:
+        if card.is_blocked != "NOT BLOCKED":
+            raise HTTPException(
+                status_code=400, detail="Player must have 3 not blocked cards")
+        
     if shape_card.is_hard:
         shape_type = HardShapes(shape_card.shape_type)
     else:
@@ -699,5 +708,24 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
         raise HTTPException(
             status_code=409, detail="Conflict with coordinates and Figure Card")
     
-    movements = undo_partials_movements(board, player_id, match_id, db)
-    shape_card_service.delete_shape_card(request.figure_id)
+    undo_partials_movements(board, player_id, match_id, db)
+    shape_card_service.update_shape_card(request.figure_id, True, "BLOCKED")
+    msg2 = {
+        "key": "BLOCKED_FIGURE",
+        "payload": {
+            "figure_id": request.figure_id,
+            "figure_name": shape_card.shape_type
+        }
+    }
+    await manager.broadcast_to_game(match_id, msg2)
+    await asyncio.sleep(1)        
+
+    # Tenemos que mandar de nuevo la lista porque se actualiza el color prohibido.
+    figures_found = board_service.get_formed_figures(board.id)
+
+    allow_figures_event = {
+        "key": "ALLOW_FIGURES",
+        "payload": figures_found
+    }
+
+    await manager.broadcast_to_game(match_id, allow_figures_event)
