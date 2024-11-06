@@ -1,8 +1,11 @@
+from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 from random import shuffle, randint
+from starlette.background import BackgroundTasks
 
 
 from app.cruds.board import BoardService
@@ -14,16 +17,15 @@ from app.cruds.movement_card import MovementCardService
 from app.cruds.shape_card import ShapeCardService
 from app.models.enums import *
 from app.models.models import Matches, Players
+from app.routers.players import turn_timeout
 from app.schemas import *
 from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS, FIGURE_COORDINATES
 from app.logger import logging
-from app.utils.board_shapes_algorithm import Figure, find_board_figures, Board
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches")
-
 
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket, db: Session = Depends(get_db)):
@@ -143,14 +145,6 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
 # ==================================== Auxiliares para el inicio de la partida ====================================
 
 
-def create_movement_deck(db: Session, match_id: int):
-    movement_service = MovementCardService(db)
-
-    for mov in Movements:  # Por cada tipo de enum
-        for _ in range(7):
-            movement_service.create_movement_card(mov.value, match_id)
-
-
 def give_movement_card_to_player(player_id: int, db: Session) -> list[tuple[int, str]]:
     """
     Da hasta 3 cartas de movimiento al jugador.
@@ -242,7 +236,7 @@ async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
 
 
 @router.patch("/{match_id}/start/{player_id}", status_code=200)
-async def start_match(match_id: int, player_id: int, db: Session = Depends(get_db)):
+async def start_match(match_id: int, player_id: int, db: Session = Depends(get_db), background_tasks = BackgroundTasks()):
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
@@ -257,7 +251,8 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
         if player.is_owner and player.match_id == match_id:
             match.state = MatchState.STARTED.value
-            create_movement_deck(db, match_id)  # crea el mazo movs
+            match.started_turn_time = datetime.now()
+            movement_service.create_movement_deck(match_id)
 
             # ===================== Configuro los mazos ==================================
             shapes = [(shape.value, True) for shape in HardShapes] * 2
@@ -284,8 +279,8 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
                 give_movement_card_to_player(player_i.id, db)
                 await give_shape_card_to_player(player_i.id, db, True)
-
-            return {"message": "Match started successfully"}
+            background_tasks.add_task(turn_timeout, match_id, player_id, db, match.current_player_turn, 120, background_tasks)
+            return JSONResponse({"message": "Match started successfully"}, background=background_tasks)
 
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:

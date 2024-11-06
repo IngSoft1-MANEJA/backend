@@ -1,7 +1,8 @@
-import asyncio
-import copy
+from asyncio import sleep
+from copy import copy
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
@@ -240,8 +241,83 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
     return {"player_id": player_id, "players": player_name}
 
 
+TURN_TIMER = 120
+
+async def turn_timeout(match_id: int, player_id: int, db: Session, turn_order: int, timer = TURN_TIMER, background_tasks = BackgroundTasks()):
+    await sleep(timer)
+    match = db.get(Matches, match_id)
+    if match is not None and match.started_turn_time and match.current_player_turn == turn_order and datetime.now() - match.started_turn_time >= timedelta(timer):
+        movement_card_service = MovementCardService(db)
+        tile_service = TileService(db)
+        board_service = BoardService(db)
+        player_service = PlayerService(db)
+        
+        try:
+            player = player_service.get_player_by_id(player_id)
+            match = MatchService(db).get_match_by_id(match_id)
+            board = board_service.get_board_by_match_id(match_id)
+        except Exception:
+            return None
+
+        movements = []
+        tiles = []
+        for _ in range(len(board.temporary_movements)):
+            try:
+                last_movement = board_service.get_last_temporary_movements(
+                    board.id)
+            except NoResultFound as e:
+                return None
+        
+            tile1 = last_movement.tile1
+            tile2 = last_movement.tile2
+
+            try:
+                movement = movement_card_service.get_movement_card_by_id(
+                    last_movement.id_mov)
+                movement_card_service.add_movement_card_to_player(player_id, movement.id)
+            except NoResultFound as e:
+                return None
+            
+            movements.append((movement.id, movement.mov_type))
+            tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
+            "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+            aux_tile = copy(tile1)
+            
+            try:
+                tile_service.update_tile_position(
+                    tile1.id, tile2.position_x, tile2.position_y)
+                tile_service.update_tile_position(
+                    tile2.id, aux_tile.position_x, aux_tile.position_y)
+            except NoResultFound as e:
+                return None
+            
+            await sleep(1)
+            msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
+            await manager.broadcast_to_game(match_id, msg)
+                
+        
+        next_player = end_turn_logic(player, match, db)
+        movements += give_movement_card_to_player(player_id, db)
+
+        await notify_movement_card_to_player(player_id, match_id, movements)
+        await notify_all_players_movements_received(player, match)
+        await give_shape_card_to_player(player.id, db, is_init=False)
+
+        msg = {
+            "key": "END_PLAYER_TURN",
+            "payload": {
+                "current_player_turn": player.turn_order,
+                "current_player_name": player.player_name,
+                "next_player_name": next_player.player_name,
+                "next_player_turn": next_player.turn_order
+            }
+        }
+        await manager.broadcast_to_game(match.id, msg)
+
+        background_tasks.add_task(turn_timeout(match_id, db, match.current_player_turn, 120))
+
 @router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
-async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
+async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db), background_tasks = BackgroundTasks()):
     movement_card_service = MovementCardService(db)
     board_service = BoardService(db)
     tile_service = TileService(db)
@@ -281,7 +357,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         movements.append((movement.id, movement.mov_type))
         tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
         "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
-        aux_tile = copy.copy(tile1)
+        aux_tile = copy(tile1)
         
         try:
             tile_service.update_tile_position(
@@ -291,7 +367,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         except NoResultFound as e:
             raise HTTPException(status_code=404, detail=e)
         
-        await asyncio.sleep(1)
+        await sleep(1)
         msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
         await manager.broadcast_to_game(match_id, msg)
             
@@ -313,6 +389,8 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         }
     }
     await manager.broadcast_to_game(match.id, msg)
+
+    background_tasks.add_task(turn_timeout,match_id, player_id, db, match.current_player_turn, 120, background_tasks)
 
 
 def validate_partial_move(partialMove: PartialMove, card_type: str):
@@ -395,7 +473,7 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
         except NoResultFound:
             raise HTTPException(status_code=404, detail="Tile not found")
 
-        aux_tile = copy.copy(tile1)
+        aux_tile = copy(tile1)
         tile_service.update_tile_position(
             tile1.id, tile2.position_x, tile2.position_y)
         tile_service.update_tile_position(
@@ -491,7 +569,7 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Movement card not found")
 
-    aux_tile = copy.copy(tile1)
+    aux_tile = copy(tile1)
 
     try:
         tile_service.update_tile_position(
@@ -595,7 +673,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
                     "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}
             ))
 
-            aux_tile = copy.copy(tile1)
+            aux_tile = copy(tile1)
             tile_service.update_tile_position(
                 tile1.id, tile2.position_x, tile2.position_y)
             tile_service.update_tile_position(
@@ -613,7 +691,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
         for tiles_to_swap in tiles:
             msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles_to_swap}}
             await manager.broadcast_to_game(match_id, msg)
-            await asyncio.sleep(1)
+            await sleep(1)
 
     msg2 = {
         "key": "COMPLETED_FIGURE",
@@ -623,7 +701,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
         }
     }
     await manager.broadcast_to_game(match_id, msg2)
-    await asyncio.sleep(1)
+    await sleep(1)
     await player_winner_by_no_shapes(player, match, db)        
 
     figures_found = board_service.get_formed_figures(board.id)

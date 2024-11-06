@@ -2,6 +2,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 
+from app.models.enums import Movements
 from app.models.models import MovementCards
 from app.utils.utils import validate_movement
 from app.exceptions import MovementCardNotFound, NoMovementCardsFound
@@ -177,3 +178,12 @@ class MovementCardService:
         self.db.commit()
         self.db.refresh(movement_card)
         return movement_card
+    
+    def create_movement_deck(self, match_id: int):
+        deck = []
+        for mov in Movements:
+            for _ in range(7):
+                movement_card = MovementCards(mov_type=mov.value, match_id=match_id)
+                deck.append(movement_card)
+        self.db.add_all(deck)
+        self.db.commit()
