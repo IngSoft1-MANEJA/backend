@@ -522,6 +522,48 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
     return {"tiles": tiles, "movement_card": movement_card}
 
 
+async def undo_partials_movements(board, player_id, match_id, db: Session = Depends(get_db)):
+    board_service = BoardService(db)
+    tile_service = TileService(db)
+    movement_card_service = MovementCardService(db)
+    movements = []
+    tiles = []
+    for _ in range(len(board.temporary_movements)):
+        last_movement = board_service.get_last_temporary_movements(
+            board.id)
+        if last_movement.create_figure:
+            break
+        tile1 = last_movement.tile1
+        tile2 = last_movement.tile2
+
+        movement = movement_card_service.get_movement_card_by_id(
+            last_movement.id_mov)
+        movement_card_service.add_movement_card_to_player(player_id, movement.id)
+        
+        movements.append((movement.id, movement.mov_type))
+        tiles.append((
+            {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
+                "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}
+        ))
+
+        aux_tile = copy.copy(tile1)
+        tile_service.update_tile_position(
+            tile1.id, tile2.position_x, tile2.position_y)
+        tile_service.update_tile_position(
+            tile2.id, aux_tile.position_x, aux_tile.position_y)
+
+    for _ in board.temporary_movements:
+        last_movement = board_service.get_last_temporary_movements(
+            board.id)
+    
+    if tiles:
+        for tiles_to_swap in tiles:
+            msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles_to_swap}}
+            await manager.broadcast_to_game(match_id, msg)
+            await asyncio.sleep(1)
+
+    return movements
+
 @router.post("/{match_id}/player/{player_id}/use-figure", status_code=200)
 async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Session = Depends(get_db)):
     match_service = MatchService(db)
@@ -574,44 +616,11 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
             raise HTTPException(
                 status_code=409, detail="Conflict with coordinates and Figure Card")
 
-        movements = []
-        tiles = []
-        for _ in range(len(board.temporary_movements)):
-            last_movement = board_service.get_last_temporary_movements(
-                board.id)
-            if last_movement.create_figure:
-                break
-            tile1 = last_movement.tile1
-            tile2 = last_movement.tile2
-
-            movement = movement_card_service.get_movement_card_by_id(
-                last_movement.id_mov)
-            movement_card_service.add_movement_card_to_player(player_id, movement.id)
-            
-            movements.append((movement.id, movement.mov_type))
-            tiles.append((
-                {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
-                    "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}
-            ))
-
-            aux_tile = copy.copy(tile1)
-            tile_service.update_tile_position(
-                tile1.id, tile2.position_x, tile2.position_y)
-            tile_service.update_tile_position(
-                tile2.id, aux_tile.position_x, aux_tile.position_y)
-
+        movements = undo_partials_movements(board, player_id, match_id, db)
         shape_card_service.delete_shape_card(request.figure_id)
-        for _ in board.temporary_movements:
-            last_movement = board_service.get_last_temporary_movements(
-                board.id)
+
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
-
-    if tiles:
-        for tiles_to_swap in tiles:
-            msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles_to_swap}}
-            await manager.broadcast_to_game(match_id, msg)
-            await asyncio.sleep(1)
 
     msg2 = {
         "key": "COMPLETED_FIGURE",
@@ -633,3 +642,62 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     await manager.broadcast_to_game(match_id, allow_figures_event)
 
     return {"movement_cards": movements}
+
+
+@router.post("/{match_id}/player/{player_id}/block-figure", status_code=200)
+async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
+    shape_card_service = ShapeCardService(db)
+    board_service = BoardService(db)
+    tile_service = TileService(db)
+    movement_card_service = MovementCardService(db)
+
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    try:
+        player = player_service.get_player_by_id(player_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    if player.turn_order != match.current_player_turn:
+        raise HTTPException(
+            status_code=403, detail=f"It's not player {player.player_name}'s turn")
+
+    try:
+        shape_card = shape_card_service.get_shape_card_by_id(request.figure_id)
+
+        if not shape_card.is_visible or shape_card.player_owner not in match.current_players:
+            raise HTTPException(
+                status_code=404, detail="Figure card doesn't belong to this match")
+    
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Figure Card not found")
+    
+    if shape_card.is_hard:
+        shape_type = HardShapes(shape_card.shape_type)
+    else:
+        shape_type = EasyShapes(shape_card.shape_type)
+         
+    valid_coordinates = FIGURE_COORDINATES[shape_type.name]
+    all_valid_rotations = [valid_coordinates, rotate_90_degrees(valid_coordinates, (6, 6)), rotate_180_degrees(
+        valid_coordinates, (6, 6)), rotate_270_degrees(valid_coordinates, (6, 6))]
+
+    try:
+        board = board_service.get_board_by_id(match.board.id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Board not found")
+    
+    figures_found = list(map(lambda x: Figure(x), board_service.get_formed_figures(board.id)))
+    coordinates = request.coordinates
+    figure_to_find = Figure(tuple(map(lambda x: Coordinate(x[0], x[1]), coordinates)))
+
+    if not figure_to_find in figures_found or not Figure(translate_shape_to_bottom_left(figure_to_find, (6,6))) in all_valid_rotations:
+        raise HTTPException(
+            status_code=409, detail="Conflict with coordinates and Figure Card")
+    
+    movements = undo_partials_movements(board, player_id, match_id, db)
+    shape_card_service.delete_shape_card(request.figure_id)
