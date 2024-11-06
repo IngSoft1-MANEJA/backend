@@ -1,10 +1,8 @@
 import logging
 from typing import List
-from pydantic import BaseModel, Field, field_validator, StrictBool
+from pydantic import BaseModel, field_validator
 
 INVALID_CHARACTERS = set("!@#$%^&*()+=[]{}|\\;:'\",<>/?`~")
-
-logger = logging.getLogger(__name__)
 
 class MatchCreateIn(BaseModel):
     lobby_name: str
