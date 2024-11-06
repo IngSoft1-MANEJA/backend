@@ -713,6 +713,7 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     msg2 = {
         "key": "BLOCKED_FIGURE",
         "payload": {
+            "player_name": player.player_name,
             "figure_id": request.figure_id,
             "figure_name": shape_card.shape_type
         }
