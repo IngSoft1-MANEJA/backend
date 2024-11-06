@@ -18,6 +18,8 @@ class MatchOut(BaseModel):
     max_players: int
     current_players: int
 
+    model_config = {'from_attributes': True}
+
 
 class MatchCreateOut(MatchOut):
     player_name: str

@@ -30,6 +30,8 @@ async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
     try:
         manager.add_anonymous_connection(websocket)
         matches = match_service.get_all_matches(True)
+        matches = [MatchOut.model_validate(match).model_dump() 
+                   for match in matches]
         msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
         await websocket.send_json(msg)
         await manager.keep_alive(websocket)
