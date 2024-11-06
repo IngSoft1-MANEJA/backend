@@ -59,6 +59,7 @@ class PlayerJoinIn(BaseModel):
 
 class PlayerJoinOut(BaseModel):
     player_id: int
+    players: list[str]
 
 
 class Tile(BaseModel):

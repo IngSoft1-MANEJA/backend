@@ -115,8 +115,14 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     return {"player_id": new_player.id, "match_id": match1.id}
 
 
-@router.post("/{match_id}")
+@router.post("/{match_id}", status_code=200,
+             response_model=PlayerJoinOut, 
+             responses={404: {"description": "Match not found"}, 
+                        409: {"description": "Match is full"}})
 async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
+    """
+    Create a player and add them to the match.
+    """
     match_service = MatchService(db)
     player_service = PlayerService(db)
 
