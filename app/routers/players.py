@@ -262,6 +262,9 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     movements = []
     tiles = []
     for _ in range(len(board.temporary_movements)):
+        print("Estoy en 4", len(board.temporary_movements))
+        print(board_service.print_temporary_movements(board.id))
+            
         try:
             last_movement = board_service.get_last_temporary_movements(
                 board.id)
@@ -577,6 +580,9 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
         movements = []
         tiles = []
         for _ in range(len(board.temporary_movements)):
+            
+            print("Estoy en 1", len(board.temporary_movements))
+            print(board_service.print_temporary_movements(board.id))
             last_movement = board_service.get_last_temporary_movements(
                 board.id)
             if last_movement.create_figure:
@@ -601,9 +607,17 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
                 tile2.id, aux_tile.position_x, aux_tile.position_y)
 
         shape_card_service.delete_shape_card(request.figure_id)
-        for _ in board.temporary_movements:
-            last_movement = board_service.get_last_temporary_movements(
-                board.id)
+        
+        print("Estoy en 2", len(board.temporary_movements))
+        print(board_service.print_temporary_movements(board.id))
+        
+        for i in range(len(board.temporary_movements)):
+            print("iteracion", i)
+            last_movement = board_service.get_last_temporary_movements(board.id)
+        
+        print("Estoy en 3", len(board.temporary_movements))
+        print(board_service.print_temporary_movements(board.id))
+            
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
 
