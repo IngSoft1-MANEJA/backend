@@ -11,8 +11,7 @@ from app.cruds.movement_card import MovementCardService
 from app.models import Matches, Players, MovementCards
 from app.connection_manager import manager
 from app.models.models import Boards, Tiles
-from app.routers.matches import (create_movement_deck, 
-                                 give_movement_card_to_player, 
+from app.routers.matches import (give_movement_card_to_player, 
                                  notify_movement_card_to_player, 
                                  notify_all_players_movements_received, 
                                  give_shape_card_to_player)
@@ -143,14 +142,6 @@ def test_start_match_not_enough_players(client, load_data_for_test):
         response = client.patch("/matches/1/start/1")
         assert response.status_code == 404
 
-def test_create_movement_deck_success(client, load_matches, db_session):
-    match = db_session.query(Matches).filter(Matches.id == 1).first()
-    create_movement_deck(db_session, match.id)
-    assert len(match.movement_cards) == 49
-    
-def test_create_movement_deck_invalid(client, load_matches, db_session):
-    with pytest.raises(Exception):
-        create_movement_deck(999999)
 
 @pytest.mark.asyncio
 async def test_notify_movement_card_to_player():
