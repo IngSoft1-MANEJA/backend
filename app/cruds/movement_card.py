@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 
 from app.models.enums import Movements
-from app.models.models import MovementCards
+from app.models.models import Matches, MovementCards
 from app.utils.utils import validate_movement
 from app.exceptions import MovementCardNotFound, NoMovementCardsFound
 
@@ -180,6 +180,10 @@ class MovementCardService:
         return movement_card
     
     def create_movement_deck(self, match_id: int):
+        match = self.db.get(Matches, match_id)
+        if match is None:
+            raise NoResultFound("Match not found")
+        
         deck = []
         for mov in Movements:
             for _ in range(7):
