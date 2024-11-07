@@ -309,6 +309,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     msg = {
         "key": "END_PLAYER_TURN",
         "payload": {
+            "current_player_turn": player.turn_order,
             "current_player_name": player.player_name,
             "next_player_name": next_player.player_name,
             "next_player_turn": next_player.turn_order
@@ -606,6 +607,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
             tile_service.update_tile_position(
                 tile2.id, aux_tile.position_x, aux_tile.position_y)
 
+        figure_name = shape_card_service.get_shape_card_by_id(request.figure_id).shape_type
         shape_card_service.delete_shape_card(request.figure_id)
         
         print("Estoy en 2", len(board.temporary_movements))
@@ -630,7 +632,8 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     msg2 = {
         "key": "COMPLETED_FIGURE",
         "payload": {
-            "figure_id": request.figure_id
+            "figure_id": request.figure_id,
+            "figure_name": figure_name
         }
     }
     await manager.broadcast_to_game(match_id, msg2)

@@ -1,6 +1,8 @@
 from random import seed
+from unittest import mock
 import pytest
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound
 from fastapi import status
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -125,6 +127,16 @@ def test_join_match_success(client, load_matches, db_session):
     assert response.status_code == status.HTTP_200_OK
     match = db_session.query(Matches).filter(Matches.id == 3).first()
     assert match.current_players == current_players + 1
+
+def test_join_match_not_found(client):
+    response = client.post("/matches/99", json={"player_name": "Player 4"})
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_join_match_is_full(client):
+    with mock.patch("app.cruds.match.MatchService.get_match_by_id", return_value=MagicMock(current_players=2, max_players=2)):
+        response = client.post("/matches/1", json={"player_name": "Player 3"})
+    assert response.status_code == status.HTTP_409_CONFLICT
 
 
 def test_start_match_success(client, load_matches):
@@ -291,6 +303,7 @@ async def test_get_match_info_to_player(client, db_session):
                 "turn_order": player.turn_order,
                 "board": board_table,
                 "current_turn_player": current_player.player_name,
+                "deck_size": 0,
                 "opponents": [
                     {
                         "player_name": opponent.player_name,
@@ -301,6 +314,7 @@ async def test_get_match_info_to_player(client, db_session):
                 ]
             }
         }
+
         mock_send_to_player.assert_any_call(match_id, player_id, msg_info)
 
         msg_shapes = {
