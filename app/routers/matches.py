@@ -6,12 +6,12 @@ from random import shuffle, randint
 
 
 from app.cruds.board import BoardService
-from app.exceptions import *
 from app.connection_manager import manager
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.cruds.movement_card import MovementCardService
 from app.cruds.shape_card import ShapeCardService
+from app.exceptions import GameConnectionDoesNotExist, PlayerAlreadyConnected, PlayerNotConnected
 from app.models.enums import *
 from app.models.models import Matches, Players
 from app.schemas import *
@@ -143,31 +143,39 @@ async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     return {"player_id": new_player.id, "match_id": match1.id}
 
 
-@router.post("/{match_id}")
+@router.post("/{match_id}", status_code=200,
+             response_model=PlayerJoinOut, 
+             responses={404: {"description": "Match not found"}, 
+                        409: {"description": "Match is full"}})
 async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
-    try:
-        match_service = MatchService(db)
-        match = match_service.get_match_by_id(match_id)
-        if match.current_players >= match.max_players:
-            raise HTTPException(status_code=404, detail="Match is full")
-        player_service = PlayerService(db)
-        player = player_service.create_player(
-            playerJoinIn.player_name, match_id, False, "123")
-        match.current_players = match.current_players + 1
-        players = [player.player_name for player in match.players]
-        db.commit()
-        msg = {"key": "PLAYER_JOIN", "payload": {"name": player.player_name}}
+    """
+    Create a player and add them to the match.
+    """
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
 
-        try:
-            await manager.broadcast_to_game(match_id, msg)
-        except Exception as e:
-            logger.error("Error al enviar mensaje: %s", e)
-        
-        await notify_matches_list(db)
-        return {"player_id": player.id, "players": players}
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound as e:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    if match.current_players >= match.max_players:
+        raise HTTPException(status_code=409, detail="Match is full")
+    
+    player = player_service.create_player(
+        playerJoinIn.player_name, match_id, False, "123")
+    match.current_players = match.current_players + 1
+    players = [player.player_name for player in match.players]
+    db.commit()
+    msg = {"key": "PLAYER_JOIN", "payload": {"name": player.player_name}}
+    try:
+        await manager.broadcast_to_game(match_id, msg)
     except Exception as e:
-        print("el error cuando se quiere unir es: ", e)
-        raise HTTPException(status_code=500, detail="Error DB")
+        logger.error("Error al enviar mensaje: %s", e)
+        
+    await notify_matches_list(db)
+
+    return {"player_id": player.id, "players": players}
 
 # ==================================== Auxiliares para el inicio de la partida ====================================
 
@@ -342,6 +350,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
         player = PlayerService(db).get_player_by_id(player_id)
         board_table = BoardService(db).get_board_table(match.board.id)
         players_in_match = PlayerService(db).get_players_by_match(match_id)
+        deck_size = ShapeCardService(db).get_deck_size(player_id)
     except Exception as e:
         print(f"Error al obtener informacion de la partida: {e}")
         raise HTTPException(
@@ -355,6 +364,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
             "turn_order": player.turn_order,
             "board": board_table,
             "current_turn_player": current_player.player_name,
+            "deck_size": deck_size,
             "opponents": [
                 {
                     "player_name": opponent.player_name,
