@@ -26,7 +26,7 @@ from app.routers.matches import (give_movement_card_to_player,
                                  give_shape_card_to_player,
                                  notify_all_players_movements_received,
                                  notify_movement_card_to_player)
-from app.schemas import PartialMove, UseFigure
+from app.schemas import MatchOut, PartialMove, UseFigure
 from app.utils.board_shapes_algorithm import (Coordinate, Figure,
                                               rotate_90_degrees,
                                               rotate_180_degrees,
@@ -236,6 +236,15 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
     if match_to_leave.current_players == 1 and match_to_leave.state == "STARTED":
         await playerWinner(match_id, ReasonWinning.FORFEIT, db)
+
+    try:
+        matches = match_service.get_all_matches(True)
+        matches = [MatchOut.model_validate(match).model_dump() 
+                for match in matches]
+        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+        await manager.broadcast(msg)
+    except Exception as e:
+        logger.error("Error al enviar mensaje: %s", e)
 
     return {"player_id": player_id, "players": player_name}
 
