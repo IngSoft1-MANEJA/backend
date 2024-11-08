@@ -74,6 +74,16 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
             # El jugador ya ha sido desconectado, no hacer nada
             pass
 
+async def notify_matches_list(db):
+    match_service = MatchService(db)
+    try:
+        matches = match_service.get_all_matches(True)
+        matches = [MatchOut.model_validate(match).model_dump() 
+                for match in matches]
+        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+        await manager.broadcast(msg)
+    except Exception as e:
+        logger.error("Error al enviar mensaje: %s", e)
 
 @router.get("/", response_model=list[MatchOut])
 def get_matches(
@@ -127,14 +137,8 @@ async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     new_player = player_service.create_player(
         match.player_name, match1.id, True, match.token)
     manager.create_game_connection(match1.id)
-    try:
-        matches = match_service.get_all_matches(True)
-        matches = [MatchOut.model_validate(match).model_dump() 
-                    for match in matches]
-        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
-        await manager.broadcast(msg)
-    except Exception as e:
-        logger.error("Error al enviar mensaje: %s", e)
+    
+    await notify_matches_list(db)
 
     return {"player_id": new_player.id, "match_id": match1.id}
 
@@ -156,14 +160,10 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
 
         try:
             await manager.broadcast_to_game(match_id, msg)
-
-            matches = match_service.get_all_matches(True)
-            matches = [MatchOut.model_validate(match).model_dump() 
-                   for match in matches]
-            msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
-            await manager.broadcast(msg)
         except Exception as e:
             logger.error("Error al enviar mensaje: %s", e)
+        
+        await notify_matches_list(db)
         return {"player_id": player.id, "players": players}
     except Exception as e:
         print("el error cuando se quiere unir es: ", e)
