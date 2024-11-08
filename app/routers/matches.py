@@ -9,18 +9,18 @@ from starlette.background import BackgroundTasks
 
 
 from app.cruds.board import BoardService
-from app.exceptions import *
 from app.connection_manager import manager
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.cruds.movement_card import MovementCardService
 from app.cruds.shape_card import ShapeCardService
+from app.exceptions import GameConnectionDoesNotExist, PlayerAlreadyConnected, PlayerNotConnected
 from app.models.enums import *
 from app.models.models import Matches, Players
 from app.routers.players import turn_timeout
 from app.schemas import *
 from app.database import get_db
-from app.utils.utils import MAX_SHAPE_CARDS, FIGURE_COORDINATES
+from app.utils.utils import MAX_SHAPE_CARDS
 from app.logger import logging
 
 logger = logging.getLogger(__name__)
@@ -118,29 +118,37 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     return {"player_id": new_player.id, "match_id": match1.id}
 
 
-@router.post("/{match_id}")
+@router.post("/{match_id}", status_code=200,
+             response_model=PlayerJoinOut, 
+             responses={404: {"description": "Match not found"}, 
+                        409: {"description": "Match is full"}})
 async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
-    try:
-        match_service = MatchService(db)
-        match = match_service.get_match_by_id(match_id)
-        if match.current_players >= match.max_players:
-            raise HTTPException(status_code=404, detail="Match is full")
-        player_service = PlayerService(db)
-        player = player_service.create_player(
-            playerJoinIn.player_name, match_id, False, "123")
-        match.current_players = match.current_players + 1
-        players = [player.player_name for player in match.players]
-        db.commit()
-        msg = {"key": "PLAYER_JOIN", "payload": {"name": player.player_name}}
+    """
+    Create a player and add them to the match.
+    """
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
 
-        try:
-            await manager.broadcast_to_game(match_id, msg)
-        except Exception as e:
-            print(f"Error al enviar mensaje: {e}")
-        return {"player_id": player.id, "players": players}
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound as e:
+        raise HTTPException(status_code=404, detail="Match not found")
+    
+    if match.current_players >= match.max_players:
+        raise HTTPException(status_code=409, detail="Match is full")
+    
+    player = player_service.create_player(
+        playerJoinIn.player_name, match_id, False, "123")
+    match.current_players = match.current_players + 1
+    players = [player.player_name for player in match.players]
+    db.commit()
+    msg = {"key": "PLAYER_JOIN", "payload": {"name": player.player_name}}
+    try:
+        await manager.broadcast_to_game(match_id, msg)
     except Exception as e:
-        print("el error cuando se quiere unir es: ", e)
-        raise HTTPException(status_code=500, detail="Error DB")
+        print(f"Error al enviar mensaje: {e}")
+
+    return {"player_id": player.id, "players": players}
 
 # ==================================== Auxiliares para el inicio de la partida ====================================
 
