@@ -238,7 +238,7 @@ async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
         if not ShapeDeck:
             break  # No hay más cartas en el mazo
         shape = ShapeDeck.pop(randint(0, len(ShapeDeck) - 1))
-        ShapeCardService(db).update_shape_card(shape.id, True, False)
+        ShapeCardService(db).update_shape_card(shape.id, True, "NOT_BLOCKED")
         ShapesGiven.append((shape.id, shape.shape_type))
 
     if not is_init:

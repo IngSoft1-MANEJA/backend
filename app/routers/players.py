@@ -657,35 +657,46 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     try:
         match = match_service.get_match_by_id(match_id)
     except NoResultFound:
+        print("error 1")
         raise HTTPException(status_code=404, detail="Match not found")
 
     try:
         player = player_service.get_player_by_id(player_id)
     except ValueError:
+        print("error 2")
         raise HTTPException(status_code=404, detail="Player not found")
 
     if player.turn_order != match.current_player_turn:
+        print("error 3")
         raise HTTPException(
             status_code=403, detail=f"It's not player {player.player_name}'s turn")
 
     try:
         shape_card = shape_card_service.get_shape_card_by_id(request.figure_id)
     except NoResultFound:
+        print("error 4")
         raise HTTPException(status_code=404, detail="Figure Card not found")
 
-    if not shape_card.is_visible or shape_card.player_owner not in match.current_players:
+    players = player_service.get_players_by_match(match_id)
+    player_owner = player_service.get_player_by_id(shape_card.player_owner)
+    if not shape_card.is_visible or player_owner not in players:
         raise HTTPException(
             status_code=404, detail="Figure card doesn't belong to this match")
-    elif shape_card.is_blocked != "NOT BLOCKED":
+    
+    elif shape_card.is_blocked != "NOT_BLOCKED":
+        print("shape_card is blocked", shape_card.is_blocked)
+        print("error 6")
         raise HTTPException(
             status_code=400, detail="Figure card is already blocked")
 
     cards = shape_card_service.get_shape_card_by_player(player_id)
     if len(cards) < 3:
+        print("error 6,5")
         raise HTTPException(
             status_code=400, detail="Player must have at least 3 figure cards to block one")
     for card in cards:
-        if card.is_blocked != "NOT BLOCKED":
+        if card.is_blocked != "NOT_BLOCKED":
+            print("error 7")
             raise HTTPException(
                 status_code=400, detail="Player must have 3 not blocked cards")
         
@@ -701,6 +712,7 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     try:
         board = board_service.get_board_by_id(match.board.id)
     except NoResultFound:
+        print("error 8")
         raise HTTPException(status_code=404, detail="Board not found")
     
     figures_found = list(map(lambda x: Figure(x), board_service.get_formed_figures(board.id)))
@@ -708,6 +720,7 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     figure_to_find = Figure(tuple(map(lambda x: Coordinate(x[0], x[1]), coordinates)))
 
     if not figure_to_find in figures_found or not Figure(translate_shape_to_bottom_left(figure_to_find, (6,6))) in all_valid_rotations:
+        print("error 9")
         raise HTTPException(
             status_code=409, detail="Conflict with coordinates and Figure Card")
     
