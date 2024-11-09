@@ -306,6 +306,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     msg = {
         "key": "END_PLAYER_TURN",
         "payload": {
+            "current_player_turn": player.turn_order,
             "current_player_name": player.player_name,
             "next_player_name": next_player.player_name,
             "next_player_turn": next_player.turn_order
@@ -616,6 +617,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
             raise HTTPException(
                 status_code=409, detail="Conflict with coordinates and Figure Card")
 
+        figure_name = shape_card_service.get_shape_card_by_id(request.figure_id).shape_type
         movements = undo_partials_movements(board, player_id, match_id, db)
         shape_card_service.delete_shape_card(request.figure_id)
 
@@ -625,7 +627,8 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     msg2 = {
         "key": "COMPLETED_FIGURE",
         "payload": {
-            "figure_id": request.figure_id
+            "figure_id": request.figure_id,
+            "figure_name": figure_name
         }
     }
     await manager.broadcast_to_game(match_id, msg2)

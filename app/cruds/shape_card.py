@@ -163,3 +163,15 @@ class ShapeCardService():
         # REVISAR CUANDO SEA 0
         except NoResultFound:
             raise NoResultFound(f"Player with id {player_id} has not visible cards")
+    
+    def get_deck_size(self, player_id: int) -> int:
+        """
+            Obtiene el tamaÃ±o del mazo de un jugador.
+            Args:
+                - player_id : id del jugador.
+        """
+        try:
+            deck_size = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).count()
+            return deck_size
+        except NoResultFound:
+            raise NoResultFound(f"Player with id {player_id} has not shape cards")

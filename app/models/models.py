@@ -166,7 +166,7 @@ class Boards(Base):
     def print_temporary_movements(self):
         for movement in self.temporary_movements:
             print(
-                f"Movement: {movement.tile1} -> {movement.tile2}, id_mov: {movement.id_mov}")
+                f"Movement: {movement.tile1} -> {movement.tile2}, id_mov: {movement.id_mov}, create: {movement.create_figure}")
 
 # ================================================ TILES MODELS ===================================#
 
