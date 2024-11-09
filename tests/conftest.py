@@ -24,11 +24,15 @@ from app.models.models import *
 from app.routers import matches, players
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-
+os.environ["TURN_TIMER"] = "1"
+os.environ["SQLALCHEMY_DATABASE_URL"] = "sqlite:///tests/test_db.sqlite"
+os.environ["SQLALCHEMY_DATABASE_FILENAME"] = "test_db.sqlite"
+os.environ["SQLALCHEMY_DATABASE_PATH"] = basedir + '/' + "test_db.sqlite"
 
 @pytest.fixture
 def db_session():
-    SQLALCHEMY_DATABASE_URL = "sqlite:///tests/test_db.sqlite"
+    SQLALCHEMY_DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL")
+    SQLALCHEMY_DATABASE_PATH = os.getenv("SQLALCHEMY_DATABASE_URL")
     engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
     Base.metadata.create_all(bind=engine, checkfirst=True)
     init_session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -38,7 +42,7 @@ def db_session():
     finally:
         db.close()
     Base.metadata.drop_all(bind=engine)
-    os.remove(basedir + "/test_db.sqlite")
+    os.remove(SQLALCHEMY_DATABASE_PATH)
 
 
 @pytest.fixture
