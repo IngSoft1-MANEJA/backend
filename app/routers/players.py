@@ -245,6 +245,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     movement_card_service = MovementCardService(db)
     board_service = BoardService(db)
     tile_service = TileService(db)
+    shape_card_service = ShapeCardService(db)
     
     try:
         player = PlayerService(db).get_player_by_id(player_id)
@@ -301,7 +302,15 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
 
     await notify_movement_card_to_player(player_id, match_id, movements)
     await notify_all_players_movements_received(player, match)
-    await give_shape_card_to_player(player.id, db, is_init=False)
+
+    cant_draw = False
+    cards = shape_card_service.get_shape_card_by_player(player_id)
+    for card in cards:
+        if card.is_blocked != "NOT_BLOCKED":
+            cant_draw = True
+    
+    if not cant_draw:
+        await give_shape_card_to_player(player.id, db, is_init=False)
 
     msg = {
         "key": "END_PLAYER_TURN",
@@ -571,8 +580,6 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     player_service = PlayerService(db)
     shape_card_service = ShapeCardService(db)
     board_service = BoardService(db)
-    tile_service = TileService(db)
-    movement_card_service = MovementCardService(db)
 
     try:
         match = match_service.get_match_by_id(match_id)
@@ -618,7 +625,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
                 status_code=409, detail="Conflict with coordinates and Figure Card")
 
         figure_name = shape_card_service.get_shape_card_by_id(request.figure_id).shape_type
-        movements = undo_partials_movements(board, player_id, match_id, db)
+        movements = await undo_partials_movements(board, player_id, match_id, db)
         shape_card_service.delete_shape_card(request.figure_id)
 
     except NoResultFound:
@@ -657,24 +664,20 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     try:
         match = match_service.get_match_by_id(match_id)
     except NoResultFound:
-        print("error 1")
         raise HTTPException(status_code=404, detail="Match not found")
 
     try:
         player = player_service.get_player_by_id(player_id)
     except ValueError:
-        print("error 2")
         raise HTTPException(status_code=404, detail="Player not found")
 
     if player.turn_order != match.current_player_turn:
-        print("error 3")
         raise HTTPException(
             status_code=403, detail=f"It's not player {player.player_name}'s turn")
 
     try:
         shape_card = shape_card_service.get_shape_card_by_id(request.figure_id)
     except NoResultFound:
-        print("error 4")
         raise HTTPException(status_code=404, detail="Figure Card not found")
 
     players = player_service.get_players_by_match(match_id)
@@ -684,19 +687,16 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
             status_code=404, detail="Figure card doesn't belong to this match")
     
     elif shape_card.is_blocked != "NOT_BLOCKED":
-        print("shape_card is blocked", shape_card.is_blocked)
-        print("error 6")
         raise HTTPException(
             status_code=400, detail="Figure card is already blocked")
 
-    cards = shape_card_service.get_shape_card_by_player(player_id)
+    cards = shape_card_service.get_shape_card_by_player(shape_card.player_owner)
     if len(cards) < 3:
-        print("error 6,5")
         raise HTTPException(
             status_code=400, detail="Player must have at least 3 figure cards to block one")
+   
     for card in cards:
         if card.is_blocked != "NOT_BLOCKED":
-            print("error 7")
             raise HTTPException(
                 status_code=400, detail="Player must have 3 not blocked cards")
         
@@ -712,7 +712,6 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     try:
         board = board_service.get_board_by_id(match.board.id)
     except NoResultFound:
-        print("error 8")
         raise HTTPException(status_code=404, detail="Board not found")
     
     figures_found = list(map(lambda x: Figure(x), board_service.get_formed_figures(board.id)))
@@ -720,15 +719,15 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     figure_to_find = Figure(tuple(map(lambda x: Coordinate(x[0], x[1]), coordinates)))
 
     if not figure_to_find in figures_found or not Figure(translate_shape_to_bottom_left(figure_to_find, (6,6))) in all_valid_rotations:
-        print("error 9")
         raise HTTPException(
             status_code=409, detail="Conflict with coordinates and Figure Card")
     
-    undo_partials_movements(board, player_id, match_id, db)
+    movements = await undo_partials_movements(board, player_id, match_id, db)
     shape_card_service.update_shape_card(request.figure_id, True, "BLOCKED")
     msg2 = {
         "key": "BLOCKED_FIGURE",
         "payload": {
+            "player_turn": player_owner.turn_order,
             "player_name": player.player_name,
             "figure_id": request.figure_id,
             "figure_name": shape_card.shape_type
@@ -746,3 +745,4 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     }
 
     await manager.broadcast_to_game(match_id, allow_figures_event)
+    return {"movement_cards": movements}
