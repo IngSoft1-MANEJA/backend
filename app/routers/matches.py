@@ -247,7 +247,8 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
                 }
                 for opponent in players_in_match
                 if opponent.id != player_id
-            ]
+            ],
+            "turn_started": match.started_turn_time.isoformat()
         }
     }
     await manager.send_to_player(match_id, player_id, msg_info)

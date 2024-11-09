@@ -224,9 +224,10 @@ async def owner_leave(owner: Players, match: Matches, db: Session):
 
 
 async def turn_timeout(match_id: int, db: Session, turn_order: int, background_tasks):
+    match_service = MatchService(db)
     timer = int(os.getenv("TURN_TIMER"))
     await sleep(timer)
-    match = db.get(Matches, match_id)
+    match = match_service.get_match_by_id(match_id)
     logger.info("timestamp DB: %s", match.started_turn_time)
     logger.info("Now: %s", datetime.now())
     logger.info("Turn order DB: %s", turn_order)
@@ -293,14 +294,15 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
         await notify_movement_card_to_player(player.id, match_id, movements)
         await notify_all_players_movements_received(player, match)
         await give_shape_card_to_player(player.id, db, is_init=False)
-
+        db.refresh(match)
         msg = {
             "key": "END_PLAYER_TURN",
             "payload": {
                 "current_player_turn": player.turn_order,
                 "current_player_name": player.player_name,
                 "next_player_name": next_player.player_name,
-                "next_player_turn": next_player.turn_order
+                "next_player_turn": next_player.turn_order,
+                "turn_started": match.started_turn_time.isoformat()
             }
         }
         await manager.broadcast_to_game(match.id, msg)
@@ -401,12 +403,15 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         print(f"Error al enviar mensaje: {e}")
 
     if next_player:
+        db.refresh(match_to_leave)
         msg = {
             "key": "END_PLAYER_TURN",
             "payload": {
+                "current_player_turn": player_to_delete.turn_order,
                 "current_player_name": player_name,
                 "next_player_name": next_player.player_name,
-                "next_player_turn": next_player.turn_order
+                "next_player_turn": next_player.turn_order,
+                "turn_started": match_to_leave.started_turn_time.isoformat()
             }
         }
         await manager.broadcast_to_game(match_id, msg)
@@ -479,14 +484,15 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
     await notify_movement_card_to_player(player_id, match_id, movements)
     await notify_all_players_movements_received(player, match)
     await give_shape_card_to_player(player.id, db, is_init=False)
-
+    db.refresh(match)
     msg = {
         "key": "END_PLAYER_TURN",
         "payload": {
             "current_player_turn": player.turn_order,
             "current_player_name": player.player_name,
             "next_player_name": next_player.player_name,
-            "next_player_turn": next_player.turn_order
+            "next_player_turn": next_player.turn_order,
+            "turn_started": match.started_turn_time.isoformat()
         }
     }
     await manager.broadcast_to_game(match.id, msg)
@@ -772,8 +778,8 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
             
             movements.append((movement.id, movement.mov_type))
             tiles.append((
-                {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
-                    "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}
+                {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, 
+                {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}
             ))
 
             aux_tile = copy(tile1)
