@@ -23,6 +23,22 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches")
 
+@router.websocket("/ws")
+async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    await websocket.accept()
+    try:
+        manager.add_anonymous_connection(websocket)
+        matches = match_service.get_all_matches(True)
+        matches = [MatchOut.model_validate(match).model_dump() 
+                   for match in matches]
+        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+        await websocket.send_json(msg)
+        await manager.keep_alive(websocket)
+    except WebSocketDisconnect:
+        manager.remove_anonymous_connection(websocket)
+    except Exception as e:
+        logger.error("Error al enviar mensaje: %s", e)
 
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket, db: Session = Depends(get_db)):
@@ -58,6 +74,16 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
             # El jugador ya ha sido desconectado, no hacer nada
             pass
 
+async def notify_matches_list(db):
+    match_service = MatchService(db)
+    try:
+        matches = match_service.get_all_matches(True)
+        matches = [MatchOut.model_validate(match).model_dump() 
+                for match in matches]
+        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+        await manager.broadcast(msg)
+    except Exception as e:
+        logger.error("Error al enviar mensaje: %s", e)
 
 @router.get("/", response_model=list[MatchOut])
 def get_matches(
@@ -102,7 +128,7 @@ def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", status_code=200)
-def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
+async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
 
@@ -111,6 +137,8 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     new_player = player_service.create_player(
         match.player_name, match1.id, True, match.token)
     manager.create_game_connection(match1.id)
+    
+    await notify_matches_list(db)
 
     return {"player_id": new_player.id, "match_id": match1.id}
 
@@ -143,7 +171,9 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
     try:
         await manager.broadcast_to_game(match_id, msg)
     except Exception as e:
-        print(f"Error al enviar mensaje: {e}")
+        logger.error("Error al enviar mensaje: %s", e)
+        
+    await notify_matches_list(db)
 
     return {"player_id": player.id, "players": players}
 

@@ -158,3 +158,25 @@ def test_create_websocket_connection(app, manager):
         }
 
     assert 1 not in manager._games
+
+def test_add_anonymous_connection_remove_anonymous_connection(app):
+    @app.websocket("/wsTestRoute")
+    async def wsTestRoute(websocket: WebSocket):
+        await websocket.accept()
+    
+    client = TestClient(app)
+    with client.websocket_connect("/wsTestRoute") as websocket:
+        manager2.add_anonymous_connection(websocket)
+        assert manager2._connections.count(websocket)
+
+        manager2.remove_anonymous_connection(websocket)
+        assert not manager2._connections.count(websocket)
+        
+        # Raises ValueError but is handled
+        manager2.remove_anonymous_connection(websocket)
+        assert not manager2._connections.count(websocket)
+
+def test_create_connection(client):
+    with client.websocket_connect("/matches/ws") as websocket:
+        data = websocket.receive_json()
+        assert data == {"key": "MATCHES_LIST", "payload": {"matches": []}}
