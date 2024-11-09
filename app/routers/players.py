@@ -20,7 +20,7 @@ from app.database import get_db
 from app.exceptions import *
 from app.logger import logging
 from app.models import enums
-from app.models.enums import EasyShapes, HardShapes, ReasonWinning
+from app.models.enums import EasyShapes, HardShapes, ReasonWinning, Colors
 from app.models.models import Matches, Players, ShapeCards
 from app.routers.matches import (give_movement_card_to_player,
                                  give_shape_card_to_player,
@@ -60,7 +60,6 @@ async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     except RuntimeError as e:
         # Manejar el caso en que el WebSocket ya esté cerrado
         print(f"Error al enviar mensaje: {e}")
-     
 
 
 async def player_winner_by_no_shapes(player_winner: Players, match: Matches, db: Session):
@@ -73,12 +72,13 @@ async def player_winner_by_no_shapes(player_winner: Players, match: Matches, db:
             - db: Session de la base de datos
         Returns:
             - None, notifica a los jugadores que el jugador ha ganado
-    """   
-    cant_shapes = len(ShapeCardService(db).get_shape_card_by_player(player_winner.id))
-    
+    """
+    cant_shapes = len(ShapeCardService(
+        db).get_shape_card_by_player(player_winner.id))
+
     if cant_shapes == 0:
         msg_win = {
-            "key" : "WINNER",
+            "key": "WINNER",
             "payload": {
                 "player_id": player_winner.id,
                 "reason": "NORMAL"
@@ -90,6 +90,7 @@ async def player_winner_by_no_shapes(player_winner: Players, match: Matches, db:
             await manager.broadcast_to_game(match.id, msg_win)
         except RuntimeError as e:
             print(f"Error al enviar mensaje: {e}")
+
 
 def end_turn_logic(player: Players, match: Matches, db: Session):
     match_service = MatchService(db)
@@ -245,7 +246,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     movement_card_service = MovementCardService(db)
     board_service = BoardService(db)
     tile_service = TileService(db)
-    
+
     try:
         player = PlayerService(db).get_player_by_id(player_id)
     except:
@@ -267,22 +268,23 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
                 board.id)
         except NoResultFound as e:
             raise HTTPException(status_code=404, detail=e)
-    
+
         tile1 = last_movement.tile1
         tile2 = last_movement.tile2
 
         try:
             movement = movement_card_service.get_movement_card_by_id(
                 last_movement.id_mov)
-            movement_card_service.add_movement_card_to_player(player_id, movement.id)
+            movement_card_service.add_movement_card_to_player(
+                player_id, movement.id)
         except NoResultFound as e:
             raise HTTPException(status_code=404, detail=e)
-        
+
         movements.append((movement.id, movement.mov_type))
         tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
-        "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+            "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
         aux_tile = copy.copy(tile1)
-        
+
         try:
             tile_service.update_tile_position(
                 tile1.id, tile2.position_x, tile2.position_y)
@@ -290,12 +292,11 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
                 tile2.id, aux_tile.position_x, aux_tile.position_y)
         except NoResultFound as e:
             raise HTTPException(status_code=404, detail=e)
-        
+
         await asyncio.sleep(1)
         msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
         await manager.broadcast_to_game(match_id, msg)
-            
-    
+
     next_player = end_turn_logic(player, match, db)
     movements += give_movement_card_to_player(player_id, db)
 
@@ -437,12 +438,10 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
             raise HTTPException(
                 status_code=500, detail="Error with formed figures")
 
-        msg = {
-            "key": "ALLOW_FIGURES",
-            "payload": board_figures
-        }
-
-        await manager.broadcast_to_game(match_id, msg)
+        board_figures = board_service.get_formed_figures(match_id)
+        allow_figures_event = filter_allowed_figures(
+            match_id, board_service, board_figures)
+        await manager.broadcast_to_game(match_id, allow_figures_event)
 
     else:
         raise HTTPException(status_code=400, detail="Invalid movement")
@@ -517,10 +516,35 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
         raise HTTPException(
             status_code=500, detail="Error with formed figures")
 
-    msg = {"key": "ALLOW_FIGURES", "payload": board_figures}
-    await manager.broadcast_to_game(match_id, msg)
+    figures_found = board_service.get_formed_figures(board.id)
+    allow_figures_event = filter_allowed_figures(
+        match_id, board_service, figures_found)
+    await manager.broadcast_to_game(match_id, allow_figures_event)
 
     return {"tiles": tiles, "movement_card": movement_card}
+
+
+def check_ban_color(board_service: BoardService, tile_service: TileService,
+                    request: UseFigure, ban_color: str):
+    """
+        Verifica si el color de las fichas es el color baneado
+        Args:
+            - board_id: ID del tablero
+            - request: Request de la figura
+        Returns:
+            - HTTPS 409 Si la figura es del color baneado
+            - new_color_ban Si la figura no es del color baneao
+    """
+    coordinates = request.coordinates
+    for coord in coordinates:
+        tile = tile_service.get_tile_by_position(
+            coord[0], coord[1], request.board_id)
+        if tile.color == ban_color:
+            raise HTTPException(status_code=409,
+                                detail=f"The Tile in position ({tile.position_x}, {tile.position_y}) have color banned")
+        else:
+            new_color_ban = tile.color
+    return new_color_ban
 
 
 @router.post("/{match_id}/player/{player_id}/use-figure", status_code=200)
@@ -554,12 +578,12 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
                 status_code=404, detail="Figure card doesn't belong to Player")
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Figure Card not found")
-    
+
     if shape_card.is_hard:
         shape_type = HardShapes(shape_card.shape_type)
     else:
         shape_type = EasyShapes(shape_card.shape_type)
-         
+
     valid_coordinates = FIGURE_COORDINATES[shape_type.name]
     all_valid_rotations = [valid_coordinates, rotate_90_degrees(valid_coordinates, (6, 6)), rotate_180_degrees(
         valid_coordinates, (6, 6)), rotate_270_degrees(valid_coordinates, (6, 6))]
@@ -567,18 +591,22 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     try:
         board = board_service.get_board_by_id(match.board.id)
 
-        figures_found = list(map(lambda x: Figure(x), board_service.get_formed_figures(board.id)))
+        figures_found = list(map(lambda x: Figure(
+            x), board_service.get_formed_figures(board.id)))
         coordinates = request.coordinates
-        figure_to_find = Figure(tuple(map(lambda x: Coordinate(x[0], x[1]), coordinates)))
+        figure_to_find = Figure(
+            tuple(map(lambda x: Coordinate(x[0], x[1]), coordinates)))
 
-        if not figure_to_find in figures_found or not Figure(translate_shape_to_bottom_left(figure_to_find, (6,6))) in all_valid_rotations:
+        if not figure_to_find in figures_found or not Figure(translate_shape_to_bottom_left(figure_to_find, (6, 6))) in all_valid_rotations:
             raise HTTPException(
                 status_code=409, detail="Conflict with coordinates and Figure Card")
+
+        new_ban_color = check_ban_color(
+            board_service, tile_service, request, board.ban_color)
 
         movements = []
         tiles = []
         for _ in range(len(board.temporary_movements)):
-            
             last_movement = board_service.get_last_temporary_movements(
                 board.id)
             if last_movement.create_figure:
@@ -588,8 +616,9 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
 
             movement = movement_card_service.get_movement_card_by_id(
                 last_movement.id_mov)
-            movement_card_service.add_movement_card_to_player(player_id, movement.id)
-            
+            movement_card_service.add_movement_card_to_player(
+                player_id, movement.id)
+
             movements.append((movement.id, movement.mov_type))
             tiles.append((
                 {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
@@ -602,18 +631,21 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
             tile_service.update_tile_position(
                 tile2.id, aux_tile.position_x, aux_tile.position_y)
 
-        figure_name = shape_card_service.get_shape_card_by_id(request.figure_id).shape_type
+        figure_name = shape_card_service.get_shape_card_by_id(
+            request.figure_id).shape_type
         shape_card_service.delete_shape_card(request.figure_id)
-        
+
         for i in range(len(board.temporary_movements)):
-            last_movement = board_service.get_last_temporary_movements(board.id)
-            
+            last_movement = board_service.get_last_temporary_movements(
+                board.id)
+
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Tile not found")
 
     if tiles:
         for tiles_to_swap in tiles:
-            msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles_to_swap}}
+            msg = {"key": "UNDO_PARTIAL_MOVE",
+                   "payload": {"tiles": tiles_to_swap}}
             await manager.broadcast_to_game(match_id, msg)
             await asyncio.sleep(1)
 
@@ -621,20 +653,45 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
         "key": "COMPLETED_FIGURE",
         "payload": {
             "figure_id": request.figure_id,
-            "figure_name": figure_name
+            "figure_name": figure_name,
+            "ban_color": new_ban_color
         }
     }
     await manager.broadcast_to_game(match_id, msg2)
     await asyncio.sleep(1)
-    await player_winner_by_no_shapes(player, match, db)        
+    await player_winner_by_no_shapes(player, match, db)
 
     figures_found = board_service.get_formed_figures(board.id)
-
-    allow_figures_event = {
-        "key": "ALLOW_FIGURES",
-        "payload": figures_found
-    }
+    allow_figures_event = filter_allowed_figures(
+        match_id, board_service, figures_found)
 
     await manager.broadcast_to_game(match_id, allow_figures_event)
 
     return {"movement_cards": movements}
+
+
+def filter_allowed_figures(match_id: int, board_service: BoardService, 
+                           figures_found: list[Figure], tile_service: TileService):
+    """
+        Filtra las figuras que no son del color baneado
+        Args:
+            - match_id: ID de la partida
+            - board_service: Servicio de tablero
+            - figures_found: Lista de figuras del tablero
+        Returns:
+            - allow_figures_event: Mensaje de evento de ALLOW_FIGURES, con las figuras filtradas.
+    """
+    ban_color = board_service.get_ban_color(match_id)
+    filtered_figures = []
+    for figure in figures_found:
+        tile = tile_service.get_tile_by_position(figure.coordinates[0].x, 
+                                                 figure.coordinates[0].y, match_id)
+        if tile.color != ban_color:
+            filtered_figures.append(figure)
+
+    allow_figures_event = {
+        "key": "ALLOW_FIGURES",
+        "payload": filtered_figures
+    }
+
+    return allow_figures_event
