@@ -161,6 +161,7 @@ class MatchService:
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
             match.current_player_turn = turn
+            match.started_turn_time = datetime.now()
             # self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
