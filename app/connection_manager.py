@@ -1,5 +1,5 @@
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from app.exceptions import *
 
@@ -7,6 +7,27 @@ from app.exceptions import *
 class ConnectionManager:
     def __init__(self) -> None:
         self._games: Dict[int, Dict[int, WebSocket]] = {}
+        self._connections: List[WebSocket] = []
+
+    def add_anonymous_connection(self, websocket: WebSocket):
+        """Add anonymous websocket to connections
+        
+        Args:
+            websocket: connection to add.
+        """
+        self._connections.append(websocket)
+    
+    def remove_anonymous_connection(self, websocket: WebSocket):
+        """Remove anonymous websocket from connections'
+        
+        Args:
+            websocket: connection to remove.
+        """
+        try:
+            self._connections.remove(websocket)
+        except ValueError:
+            pass
+
 
     def create_game_connection(self, game_id):
         """Creates a new game entry for future connections.
@@ -15,6 +36,12 @@ class ConnectionManager:
             game_id: game's id to create.
         """
         self._games[game_id] = {}
+
+
+    async def broadcast(self, msg):
+        for websocket in self._connections:
+            await websocket.send_json(msg)
+
 
     @staticmethod
     async def keep_alive(websocket: WebSocket):
