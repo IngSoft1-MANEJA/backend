@@ -1,12 +1,11 @@
 import pytest
 from sqlalchemy.orm.exc import NoResultFound
 
-from app.cruds.match import MatchService
 from app.models.models import Matches
 from app.models.enums import MatchState
 
 
-def test_get_matches(match_service: MatchService, db_session):
+def test_get_matches(match_service, db_session):
     matches = match_service.get_all_matches()
     list_matches = [
         {'name': 'Match 1', 'max_players': 4, 'public': True},
@@ -22,7 +21,7 @@ def test_get_matches(match_service: MatchService, db_session):
     assert len(matches2) == len(matches) + 3
 
 
-def test_delete_match(match_service: MatchService, db_session):
+def test_delete_match(match_service, db_session):
     match = match_service.create_match('Test Match', 4, public=True)
     number_matches = db_session.query(Matches).count()
     match_id = match_service.get_match_id(match)
@@ -31,7 +30,7 @@ def test_delete_match(match_service: MatchService, db_session):
     assert new_number_matches == number_matches - 1
 
 
-def test_create_match(match_service: MatchService, db_session):
+def test_create_match(match_service, db_session):
     number_matches = db_session.query(Matches).count()
     match_service.create_match('Test Match', 4, public=True)
     new_number_matches = db_session.query(Matches).count()
@@ -39,7 +38,7 @@ def test_create_match(match_service: MatchService, db_session):
     assert new_number_matches == number_matches + 1
 
 
-def test_get_match_id(match_service: MatchService, db_session):
+def test_get_match_id(match_service, db_session):
     match = match_service.create_match('Test-Match-Id', 4, public=True)
     # Obtener el ID del match recién creado
     match_id = db_session.query(Matches).filter(
@@ -50,7 +49,7 @@ def test_get_match_id(match_service: MatchService, db_session):
     assert match_id == match_id2
 
 
-def test_get_match_by_id(match_service: MatchService):
+def test_get_match_by_id(match_service):
     match = match_service.create_match('Test-Match-Id', 4, public=True)
     # Obtener el ID del match recién creado
     match_id = match_service.get_match_id(match)
@@ -60,7 +59,7 @@ def test_get_match_by_id(match_service: MatchService):
     assert match == match2
 
 
-def test_update_match(match_service: MatchService):
+def test_update_match(match_service):
     match = match_service.create_match('Test-Match-Update', 4, public=True)
     # Obtener el ID del match recién creado
     match_id = match_service.get_match_id(match)
@@ -73,7 +72,7 @@ def test_update_match(match_service: MatchService):
     assert match_info.state == MatchState.WAITING.value
 
 
-def test_update_turn_success(match_service: MatchService, db_session):
+def test_update_turn_success(match_service, db_session):
     # Crear un match para la prueba
     match_service.create_match('test_match', 4, True)
     match = db_session.query(Matches).filter(Matches.match_name == 'test_match').one()
@@ -86,7 +85,7 @@ def test_update_turn_success(match_service: MatchService, db_session):
     updated_match = db_session.query(Matches).filter(Matches.id == match.id).one()
     assert updated_match.current_player_turn == new_turn
 
-def test_update_turn_failure(db_session, match_service: MatchService):
+def test_update_turn_failure(match_service):
     # Intentar actualizar el turno de un match que no existe
     non_existent_match_id = 9999
     new_turn = 2
