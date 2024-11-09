@@ -4,10 +4,13 @@ from fastapi import APIRouter, BackgroundTasks, Query, WebSocket, WebSocketDisco
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
-from random import shuffle, randint
+from random import shuffle
 from starlette.background import BackgroundTasks
 
-
+from app.routers.players import (give_movement_card_to_player,
+                                 give_shape_card_to_player,
+                                 notify_movement_card_to_player,
+                                 turn_timeout)
 from app.cruds.board import BoardService
 from app.connection_manager import manager
 from app.cruds.match import MatchService
@@ -16,8 +19,6 @@ from app.cruds.movement_card import MovementCardService
 from app.cruds.shape_card import ShapeCardService
 from app.exceptions import GameConnectionDoesNotExist, PlayerAlreadyConnected, PlayerNotConnected
 from app.models.enums import *
-from app.models.models import Matches, Players
-from app.routers.players import turn_timeout
 from app.schemas import *
 from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS
@@ -146,101 +147,9 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
     try:
         await manager.broadcast_to_game(match_id, msg)
     except Exception as e:
-        print(f"Error al enviar mensaje: {e}")
+        logger.error("Error al enviar mensaje: %s", e)
 
     return {"player_id": player.id, "players": players}
-
-# ==================================== Auxiliares para el inicio de la partida ====================================
-
-
-def give_movement_card_to_player(player_id: int, db: Session) -> list[tuple[int, str]]:
-    """
-    Da hasta 3 cartas de movimiento al jugador.
-    Args:
-        - player_id : id del jugador.
-        - db : Session de la base de datos.
-    Returns:
-        Lista de cartas dadas al jugador.
-    """
-    player_service = PlayerService(db)
-    movement_service = MovementCardService(db)
-
-    player = player_service.get_player_by_id(player_id)
-    match_id = player.match_id
-    list_movs = player.movement_cards
-    movs_to_give = 3 - len(list_movs)
-    movements_given = []
-
-    while movs_to_give > 0:
-        movements = movement_service.get_movement_cards_without_owner(match_id)
-        if not movements:
-            break  # No hay más cartas en el mazo
-        movement = movements[randint(0, len(movements) - 1)]
-        movement_service.add_movement_card_to_player(player_id, movement.id)
-        movements_given.append((movement.id, movement.mov_type))
-        movs_to_give -= 1
-
-    return movements_given
-
-
-async def notify_movement_card_to_player(player_id: int, match_id: int, buff_movement: list[tuple[int, str]]):
-    """
-        Notifica al jugador que se le dio una carta de movimiento.
-        Args:
-            - player_id : id del jugador.
-            - match_id : id de la partida.
-            - buff_movement : lista de tuplas con el id y tipo de movimiento.
-        Returns:
-            None, se comunica mediante websockets.
-    """
-    msg_user = {"key": "GET_MOVEMENT_CARD",
-                "payload": {"movement_card": buff_movement}}
-    await manager.send_to_player(match_id, player_id, msg_user)
-
-
-async def notify_all_players_movements_received(player: Players, match: Matches):
-    """
-        Notifica a los demás jugadores que un jugador recibió una carta de movimiento.
-        Args:
-            - player : jugador que recibió la carta.
-            - match : partida en la que se encuentra.
-        Returns:
-            None, se comunica mediante websockets.
-    """
-    for player_i in match.players:
-        if player_i.id != player.id:
-            msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
-                       "payload": {"player": player.player_name}}
-            await manager.send_to_player(match.id, player_i.id, msg_all)
-
-
-async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
-    """
-        Da hasta 3 cartas de figuras al jugador.
-
-        Args:
-            - player_id : id del jugador.
-            - db : Session de la base de datos.
-            - is_init : booleano que indica si es el inicio de la partida.
-    """
-    player = PlayerService(db).get_player_by_id(player_id)
-    visible_cards = ShapeCardService(db).get_visible_cards(player_id, True)
-    ShapeDeck = ShapeCardService(db).get_visible_cards(player_id, False)
-    CardsToGive = 3 - len(visible_cards)
-    ShapesGiven = []
-
-    for i in range(CardsToGive):
-        if not ShapeDeck:
-            break  # No hay más cartas en el mazo
-        shape = ShapeDeck.pop(randint(0, len(ShapeDeck) - 1))
-        ShapeCardService(db).update_shape_card(shape.id, True, False)
-        ShapesGiven.append((shape.id, shape.shape_type))
-
-    if not is_init:
-        msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
-                   "payload": [{"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}]}
-        await manager.broadcast_to_game(player.match_id, msg_all)
-# =============================================================================================================
 
 
 @router.patch("/{match_id}/start/{player_id}", status_code=200)
@@ -287,7 +196,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
                 give_movement_card_to_player(player_i.id, db)
                 await give_shape_card_to_player(player_i.id, db, True)
-            background_tasks.add_task(turn_timeout, match_id, player_id, db, match.current_player_turn, 120, background_tasks)
+            background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
             return JSONResponse({"message": "Match started successfully"}, background=background_tasks)
 
         raise HTTPException(status_code=404, detail="Match not found")
@@ -318,7 +227,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
         players_in_match = PlayerService(db).get_players_by_match(match_id)
         deck_size = ShapeCardService(db).get_deck_size(player_id)
     except Exception as e:
-        print(f"Error al obtener informacion de la partida: {e}")
+        logger.error("Error al obtener informacion de la partida: %s", e)
         raise HTTPException(
             status_code=404, detail="Error al obtener informacion de la partida")
 
