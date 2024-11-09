@@ -444,7 +444,7 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
 
         board_figures = board_service.get_formed_figures(match_id)
         allow_figures_event = filter_allowed_figures(
-            match_id, board_service, board_figures)
+            match_id, board_service, board_figures, tile_service)
         await manager.broadcast_to_game(match_id, allow_figures_event)
 
     else:
@@ -522,13 +522,13 @@ async def delete_partial_move(match_id: int, player_id: int, db: Session = Depen
 
     figures_found = board_service.get_formed_figures(board.id)
     allow_figures_event = filter_allowed_figures(
-        match_id, board_service, figures_found)
+        match_id, board_service, figures_found, tile_service)
     await manager.broadcast_to_game(match_id, allow_figures_event)
 
     return {"tiles": tiles, "movement_card": movement_card}
 
 
-def check_ban_color(board_service: BoardService, tile_service: TileService,
+def check_ban_color(board_id, tile_service: TileService,
                     request: UseFigure, ban_color: str):
     """
         Verifica si el color de las fichas es el color baneado
@@ -542,10 +542,10 @@ def check_ban_color(board_service: BoardService, tile_service: TileService,
     coordinates = request.coordinates
     for coord in coordinates:
         tile = tile_service.get_tile_by_position(
-            coord[0], coord[1], request.board_id)
+            coord[0], coord[1], board_id)
         if tile.color == ban_color:
             raise HTTPException(status_code=409,
-                                detail=f"The Tile in position ({tile.position_x}, {tile.position_y}) have color banned")
+                                detail=f"The tile is of the banned color")
         else:
             new_color_ban = tile.color
     return new_color_ban
@@ -606,7 +606,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
                 status_code=409, detail="Conflict with coordinates and Figure Card")
 
         new_ban_color = check_ban_color(
-            board_service, tile_service, request, board.ban_color)
+            board.id, tile_service, request, board.ban_color)
 
         movements = []
         tiles = []
@@ -653,6 +653,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
             await manager.broadcast_to_game(match_id, msg)
             await asyncio.sleep(1)
 
+    board_service.update_ban_color(board.id, new_ban_color)
     msg2 = {
         "key": "COMPLETED_FIGURE",
         "payload": {
@@ -667,7 +668,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
 
     figures_found = board_service.get_formed_figures(board.id)
     allow_figures_event = filter_allowed_figures(
-        match_id, board_service, figures_found)
+        match_id, board_service, figures_found, tile_service)
 
     await manager.broadcast_to_game(match_id, allow_figures_event)
 
@@ -675,7 +676,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
 
 
 def filter_allowed_figures(match_id: int, board_service: BoardService,
-                           figures_found: list[Figure], tile_service: TileService):
+                           figures_found: list[list[Coordinate]], tile_service: TileService):
     """
         Filtra las figuras que no son del color baneado
         Args:
@@ -688,9 +689,10 @@ def filter_allowed_figures(match_id: int, board_service: BoardService,
     ban_color = board_service.get_ban_color(match_id)
     filtered_figures = []
     for figure in figures_found:
-        tile = tile_service.get_tile_by_position(figure.coordinates[0].x,
-                                                 figure.coordinates[0].y, match_id)
+        print(f"Figure coordinates: {figure}")
+        tile = tile_service.get_tile_by_position(figure[0].x, figure[0].y, match_id)
         if tile.color != ban_color:
+            print(f"Tile color: {tile.color}")
             filtered_figures.append(figure)
 
     allow_figures_event = {
