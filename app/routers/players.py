@@ -670,7 +670,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     return {"movement_cards": movements}
 
 
-def filter_allowed_figures(match_id: int, board_service: BoardService, 
+def filter_allowed_figures(match_id: int, board_service: BoardService,
                            figures_found: list[Figure], tile_service: TileService):
     """
         Filtra las figuras que no son del color baneado
@@ -684,7 +684,7 @@ def filter_allowed_figures(match_id: int, board_service: BoardService,
     ban_color = board_service.get_ban_color(match_id)
     filtered_figures = []
     for figure in figures_found:
-        tile = tile_service.get_tile_by_position(figure.coordinates[0].x, 
+        tile = tile_service.get_tile_by_position(figure.coordinates[0].x,
                                                  figure.coordinates[0].y, match_id)
         if tile.color != ban_color:
             filtered_figures.append(figure)
