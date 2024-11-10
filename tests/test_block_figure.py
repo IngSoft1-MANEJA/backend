@@ -21,7 +21,9 @@ def setup_mocks():
          patch("app.routers.players.undo_partials_movements") as mock_undo_partials_movements, \
          patch("app.routers.players.rotate_90_degrees") as mock_rotate_90_degrees, \
          patch("app.routers.players.rotate_180_degrees") as mock_rotate_180_degrees, \
-         patch("app.routers.players.rotate_270_degrees") as mock_rotate_270_degrees:
+         patch("app.routers.players.rotate_270_degrees") as mock_rotate_270_degrees, \
+         patch("app.routers.players.check_ban_color") as mock_check_ban_color, \
+         patch("app.cruds.tile.TileService.get_tile_by_position") as mock_get_tile_by_position:
         
         yield {
             "mock_match_service": mock_match_service,
@@ -32,7 +34,9 @@ def setup_mocks():
             "mock_undo_partials_movements": mock_undo_partials_movements,
             "mock_rotate_90_degrees": mock_rotate_90_degrees,
             "mock_rotate_180_degrees": mock_rotate_180_degrees,
-            "mock_rotate_270_degrees": mock_rotate_270_degrees
+            "mock_rotate_270_degrees": mock_rotate_270_degrees,
+            "mock_check_ban_color": mock_check_ban_color,
+            "mock_get_tile_by_position": mock_get_tile_by_position
         }
 
 # @pytest.mark.asyncio
@@ -241,6 +245,8 @@ async def test_block_figure_board_not_found(setup_mocks):
     mocks["mock_board_service"].return_value.get_board_by_id.side_effect = NoResultFound
     mocks["mock_player_service"].return_value.get_players_by_match.return_value = [player1, player2]
     mocks["mock_player_service"].return_value.get_player_by_id.return_value = player1
+    mocks["mock_check_ban_color"].return_value = "YELLOW"
+    mocks["mock_get_tile_by_position"].return_value = MagicMock(id=1, color="YELLOW")
     
     request_data = {
         "figure_id": 1,

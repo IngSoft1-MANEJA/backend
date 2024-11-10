@@ -218,3 +218,14 @@ class BoardService:
     def clear_temporary_movements(self, tile_movements: list[TileMovement]) -> None:
         self.db.delete(tile_movements)
         self.db.commit()
+        
+    def get_ban_color(self, board_id: int) -> str:
+        """
+        Obtiene el color prohibido del tablero.
+        Args:
+            board_id: Id del tablero.
+        Returns:
+            ban_color: Color prohibido.
+        """
+        board = self.db.query(Boards).filter(Boards.id == board_id).one()
+        return board.ban_color

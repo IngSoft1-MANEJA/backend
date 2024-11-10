@@ -144,8 +144,8 @@ async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
 
 
 @router.post("/{match_id}", status_code=200,
-             response_model=PlayerJoinOut, 
-             responses={404: {"description": "Match not found"}, 
+             response_model=PlayerJoinOut,
+             responses={404: {"description": "Match not found"},
                         409: {"description": "Match is full"}})
 async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
     """
@@ -158,10 +158,10 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
         match = match_service.get_match_by_id(match_id)
     except NoResultFound as e:
         raise HTTPException(status_code=404, detail="Match not found")
-    
+
     if match.current_players >= match.max_players:
         raise HTTPException(status_code=409, detail="Match is full")
-    
+
     player = player_service.create_player(
         playerJoinIn.player_name, match_id, False, "123")
     match.current_players = match.current_players + 1
@@ -365,6 +365,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
             "board": board_table,
             "current_turn_player": current_player.player_name,
             "deck_size": deck_size,
+            "ban_color": match.board.ban_color,
             "opponents": [
                 {
                     "player_name": opponent.player_name,
