@@ -113,7 +113,7 @@ def on_filter_matches(
     filtered_matches = matches
     if match_name:
         filtered_matches = [
-            match for match in filtered_matches if match_name in match.match_name]
+            match for match in filtered_matches if match_name.lower() in match.match_name.lower()]
     if max_players:
         filtered_matches = [
             match for match in filtered_matches if match.max_players == max_players]
