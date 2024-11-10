@@ -829,7 +829,8 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
             "player_turn": player_owner.turn_order,
             "player_name": player.player_name,
             "figure_id": request.figure_id,
-            "figure_name": shape_card.shape_type
+            "figure_name": shape_card.shape_type,
+            "ban_color": new_ban_color,
         }
     }
     await manager.broadcast_to_game(match_id, msg2)
