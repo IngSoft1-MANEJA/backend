@@ -1,13 +1,14 @@
 from fastapi import WebSocket, WebSocketDisconnect, WebSocketException
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List, Union
 
 from app.exceptions import *
+from app.schemas import MatchOut
 
 
 class ConnectionManager:
-    def __init__(self) -> None:
+    def _init_(self) -> None:
         self._games: Dict[int, Dict[int, WebSocket]] = {}
-        self._connections: List[WebSocket] = []
+        self._connections: List[Dict[str, Union[str, int, WebSocket]]] = []
 
     def add_anonymous_connection(self, websocket: WebSocket):
         """Add anonymous websocket to connections
@@ -15,7 +16,8 @@ class ConnectionManager:
         Args:
             websocket: connection to add.
         """
-        self._connections.append(websocket)
+        self._connections.append({"match_name": None, "max_players": None, "websocket": websocket})
+        return len(self._connections) - 1
     
     def remove_anonymous_connection(self, websocket: WebSocket):
         """Remove anonymous websocket from connections'
@@ -24,7 +26,15 @@ class ConnectionManager:
             websocket: connection to remove.
         """
         try:
-            self._connections.remove(websocket)
+            conn_to_delete = None
+            for i, conn in enumerate(self._connections):
+                if conn["websocket"] == websocket:
+                    conn_to_delete = i
+                    break
+            if conn_to_delete == None:
+                raise ValueError("Connection not found")
+            
+            del self._connections[conn_to_delete]
         except ValueError:
             pass
 
@@ -53,6 +63,37 @@ class ConnectionManager:
 
         while True:
             await websocket.receive_text()
+
+    async def keep_alive_matches(self, index: int, on_filter_matches: Callable):
+        """Keeps websocket connections alive
+
+        Args:
+            index: index of the connection to keep alive.
+            {
+                "key" : "filter_matchEs"
+                "payload" : {
+                    "match_name": STR,
+                    o
+                    "max_players": INT,
+                }
+            }
+        """
+        while True:
+            response = await self._connections[index]["websocket"].receive_json()
+            
+            if response["key"] == "FILTER_MATCHES":
+                if "match_name" in response["payload"]:
+                    self._connections[index]["match_name"] = response["payload"]["match_name"]
+                if "max_players" in response["payload"]:
+                    self._connections[index]["max_players"] = response["payload"]["max_players"]
+
+                filtered_matches = on_filter_matches(self._connections[index]["match_name"], 
+                                                     self._connections[index]["max_players"])
+                matches = [MatchOut.model_validate(match).model_dump() 
+                        for match in filtered_matches]
+                msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+                await self._connections[index]["websocket"].send_json(msg)            
+
 
     def connect_player_to_game(self, game_id: int, player_id: int, websocket: WebSocket):
         """Connects players to game and saves the connections.
