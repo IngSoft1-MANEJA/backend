@@ -53,6 +53,18 @@ class ConnectionManager:
 
         while True:
             await websocket.receive_text()
+    
+    async def receive_and_broadcast_message(self, websocket: WebSocket, game_id: int):
+        """Keeps websocket connections alive.
+        When receive a message, broadcast it to the match
+
+        Args:
+            websocket: connection to keep alive.
+            game_id: id of the game
+        """
+        msg = await websocket.receive_json()
+        await self.broadcast_to_game(game_id, msg)
+
 
     def connect_player_to_game(self, game_id: int, player_id: int, websocket: WebSocket):
         """Connects players to game and saves the connections.

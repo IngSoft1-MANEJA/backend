@@ -52,7 +52,8 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
                 manager.create_game_connection(match_id)
         try:
             manager.connect_player_to_game(game_id, player_id, websocket)
-            await manager.keep_alive(websocket)
+            while True:
+                await manager.receive_and_broadcast_message(websocket, game_id)
         except GameConnectionDoesNotExist:
             await websocket.send_json(
                 {"Error": f"Conexión a la partida {game_id} no existe"}
