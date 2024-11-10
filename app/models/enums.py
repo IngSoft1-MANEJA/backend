@@ -68,3 +68,9 @@ def get_enum_name(enum_class, value):
         if member.value == value:
             return name
     return None
+
+
+class IsBlocked(enum.Enum):
+    NOT_BLOCKED = "Not blocked"
+    BLOCKED = "Blocked"
+    UNLOCKED = "Unlocked"
