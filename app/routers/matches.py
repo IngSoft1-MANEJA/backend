@@ -12,7 +12,7 @@ from starlette.background import BackgroundTasks
 
 from app.routers.players import (give_movement_card_to_player,
                                  give_shape_card_to_player,
-                                 notify_movement_card_to_player,
+                                 notify_movement_card_to_player, on_filter_matches,
                                  turn_timeout,
                                  notify_matches_list)
 from app.cruds.board import BoardService
