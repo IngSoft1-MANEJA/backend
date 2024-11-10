@@ -4,7 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, validates, Decla
 from sqlalchemy import DateTime, String, Integer, Boolean, ForeignKey
 
 from app.utils.utils import VALID_SHAPES
-from app.models.enums import Colors, HardShapes, EasyShapes, Movements, MatchState
+from app.models.enums import Colors, HardShapes, EasyShapes, Movements, MatchState, IsBlocked
 
 
 class Base(DeclarativeBase):
@@ -239,7 +239,7 @@ class ShapeCards(Base):
     shape_type: Mapped[int]  # mapeamos int para identificar las cartas
     is_hard: Mapped[bool]
     is_visible: Mapped[bool]
-    is_blocked: Mapped[bool]
+    is_blocked: Mapped[IsBlocked] = mapped_column(String)
     player_owner: Mapped[int] = mapped_column(
         Integer, ForeignKey('players.id', ondelete="CASCADE"), nullable=True)
 

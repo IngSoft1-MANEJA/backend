@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, BackgroundTasks, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from typing import Optional, Annotated
+from fastapi import (APIRouter, WebSocket, WebSocketDisconnect, Depends, 
+                     HTTPException)
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 from random import shuffle
@@ -34,13 +37,13 @@ async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     await websocket.accept()
     try:
-        manager.add_anonymous_connection(websocket)
+        index = manager.add_anonymous_connection(websocket) ##
         matches = match_service.get_all_matches(True)
         matches = [MatchOut.model_validate(match).model_dump() 
                    for match in matches]
         msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
         await websocket.send_json(msg)
-        await manager.keep_alive(websocket)
+        await manager.keep_alive_matches(index, lambda x, y: on_filter_matches(x,y, db))
     except WebSocketDisconnect:
         manager.remove_anonymous_connection(websocket)
     except Exception as e:
@@ -58,7 +61,8 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
                 manager.create_game_connection(match_id)
         try:
             manager.connect_player_to_game(game_id, player_id, websocket)
-            await manager.keep_alive(websocket)
+            while True:
+                await manager.receive_and_broadcast_message(websocket, game_id)
         except GameConnectionDoesNotExist:
             await websocket.send_json(
                 {"Error": f"Conexión a la partida {game_id} no existe"}
@@ -79,38 +83,6 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
         except PlayerNotConnected:
             # El jugador ya ha sido desconectado, no hacer nada
             pass
-
-
-@router.get("/", response_model=list[MatchOut])
-def get_matches(
-    s: Optional[str] = Query(None, max_length=50),
-    max_players: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
-):
-    """
-        Obtiene todas las partidas que coincidan con los filtros, si no tiene
-        filtros devuelve todas las partidas disponibles.
-        Args:
-            - s : string a buscar en el nombre de la partida.
-            - max_players : cantidad máxima de jugadores en la partida.
-            - db : Session de la base de datos.
-        Returns:
-            - Lista de partidas en esquema MatchOut.
-    """
-    matches = MatchService(db).get_all_matches(True)
-
-    if not s and not max_players:
-        return matches
-
-    filtered_matches = matches
-    if s:
-        filtered_matches = [
-            match for match in filtered_matches if s in match.match_name]
-    if max_players:
-        filtered_matches = [
-            match for match in filtered_matches if match.max_players == max_players]
-
-    return filtered_matches
 
 
 @router.get("/{match_id}", response_model=MatchOut)
@@ -140,8 +112,8 @@ async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
 
 
 @router.post("/{match_id}", status_code=200,
-             response_model=PlayerJoinOut, 
-             responses={404: {"description": "Match not found"}, 
+             response_model=PlayerJoinOut,
+             responses={404: {"description": "Match not found"},
                         409: {"description": "Match is full"}})
 async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
     """
@@ -154,10 +126,10 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
         match = match_service.get_match_by_id(match_id)
     except NoResultFound as e:
         raise HTTPException(status_code=404, detail="Match not found")
-    
+
     if match.current_players >= match.max_players:
         raise HTTPException(status_code=409, detail="Match is full")
-    
+
     player = player_service.create_player(
         playerJoinIn.player_name, match_id, False, "123")
     match.current_players = match.current_players + 1
@@ -262,6 +234,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
             "board": board_table,
             "current_turn_player": current_player.player_name,
             "deck_size": deck_size,
+            "ban_color": match.board.ban_color,
             "opponents": [
                 {
                     "player_name": opponent.player_name,
