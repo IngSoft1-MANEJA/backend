@@ -1,5 +1,7 @@
-from typing import Optional
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from typing import Optional, Annotated
+from fastapi import (APIRouter, Query, WebSocket, WebSocketDisconnect, Depends, 
+                     HTTPException, Security)
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 from random import shuffle, randint
@@ -28,13 +30,13 @@ async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     await websocket.accept()
     try:
-        manager.add_anonymous_connection(websocket)
+        index = manager.add_anonymous_connection(websocket) ##
         matches = match_service.get_all_matches(True)
         matches = [MatchOut.model_validate(match).model_dump() 
                    for match in matches]
         msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
         await websocket.send_json(msg)
-        await manager.keep_alive(websocket)
+        await manager.keep_alive_matches(index, lambda x, y: on_filter_matches(x,y, db))
     except WebSocketDisconnect:
         manager.remove_anonymous_connection(websocket)
     except Exception as e:
@@ -75,21 +77,23 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
             pass
 
 async def notify_matches_list(db):
-    match_service = MatchService(db)
     try:
-        matches = match_service.get_all_matches(True)
-        matches = [MatchOut.model_validate(match).model_dump() 
-                for match in matches]
-        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
-        await manager.broadcast(msg)
+        for conn in manager._connections:
+            filtered_matches = on_filter_matches(conn["match_name"], 
+                                                 conn["max_players"], db)
+            matches = [MatchOut.model_validate(match).model_dump() 
+                    for match in filtered_matches]
+            msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+            await conn["websocket"].send_json(msg)
+        
     except Exception as e:
         logger.error("Error al enviar mensaje: %s", e)
 
-@router.get("/", response_model=list[MatchOut])
-def get_matches(
-    s: Optional[str] = Query(None, max_length=50),
-    max_players: Optional[int] = Query(None),
-    db: Session = Depends(get_db)
+
+def on_filter_matches(
+    match_name: Optional[str],
+    max_players: Optional[int],
+    db: Session
 ):
     """
         Obtiene todas las partidas que coincidan con los filtros, si no tiene
@@ -103,13 +107,13 @@ def get_matches(
     """
     matches = MatchService(db).get_all_matches(True)
 
-    if not s and not max_players:
+    if not match_name and not max_players:
         return matches
 
     filtered_matches = matches
-    if s:
+    if match_name:
         filtered_matches = [
-            match for match in filtered_matches if s in match.match_name]
+            match for match in filtered_matches if match_name in match.match_name]
     if max_players:
         filtered_matches = [
             match for match in filtered_matches if match.max_players == max_players]
