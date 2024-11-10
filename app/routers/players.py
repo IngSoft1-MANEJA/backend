@@ -786,7 +786,9 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
         if card.is_blocked != "NOT_BLOCKED":
             raise HTTPException(
                 status_code=400, detail="Player must have 3 not blocked cards")
-        
+            
+    new_ban_color = check_ban_color(board.id, tile_service, request, board.ban_color)
+
     if shape_card.is_hard:
         shape_type = HardShapes(shape_card.shape_type)
     else:
@@ -823,10 +825,12 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
     await manager.broadcast_to_game(match_id, msg2)
     await asyncio.sleep(1)        
 
-    # Tenemos que mandar de nuevo la lista porque se actualiza el color prohibido.
+    # Tenemos que mandar de nuevo la lista porque se actualiza el color prohibido.\
+    board_service.update_ban_color(board.id, new_ban_color)
     figures_found = board_service.get_formed_figures(board.id)
     allow_figures_event = filter_allowed_figures(
         match_id, board_service, figures_found, tile_service)
 
     await manager.broadcast_to_game(match_id, allow_figures_event)
+    
     return {"movement_cards": movements}
