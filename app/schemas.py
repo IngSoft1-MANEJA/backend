@@ -8,7 +8,6 @@ class MatchCreateIn(BaseModel):
     is_public: bool
     max_players: int
     player_name: str
-    token: str
 
     @field_validator("lobby_name", "player_name")
     @classmethod
@@ -46,7 +45,6 @@ class MatchCreateOut(MatchOut):
 
 class PlayerJoinIn(BaseModel):
     player_name: str
-    token: str # Agrego token al join para identitficar al jugador
 
     @field_validator("player_name")
     @classmethod
