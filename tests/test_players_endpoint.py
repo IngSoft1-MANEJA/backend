@@ -5,11 +5,12 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm.session import Session
 
 from app.models.enums import EasyShapes, ReasonWinning
-from app.schemas import PartialMove, Tile
+from app.schemas import PartialMove, Tile, UseFigure
 from app.exceptions import PlayerNotConnected
-from app.routers.players import validate_partial_move
+from app.routers.players import check_ban_color, filter_allowed_figures, validate_partial_move
 from app.utils.board_shapes_algorithm import rotate_90_degrees, rotate_180_degrees, rotate_270_degrees
 from app.utils.utils import FIGURE_COORDINATES
+from app.utils.board_shapes_algorithm import Coordinate
 
 
 @pytest.fixture(scope="function")
@@ -603,3 +604,77 @@ def test_use_figure_with_movement_return(setup_player_mocks, setup_match_mocks, 
     print(response.json())
     assert (response.status_code == 409)
     assert (response.json() == {"detail": "Conflict with coordinates and Figure Card"})
+    
+def test_check_ban_color_no_banned_color():
+    # Arrange
+    board_id = 1
+    ban_color = "red"
+    request = UseFigure(figure_id=1, coordinates=[(0, 0), (1, 1)])
+    tile_service = MagicMock()
+    tile_service.get_tile_by_position.side_effect = [
+        MagicMock(color="blue"),
+        MagicMock(color="green")
+    ]
+
+    # Act
+    new_color_ban = check_ban_color(board_id, tile_service, request, ban_color)
+
+    # Assert
+    assert new_color_ban == "green"
+
+def test_check_ban_color_with_banned_color():
+    # Arrange
+    board_id = 1
+    ban_color = "red"
+    request = UseFigure(figure_id=1, coordinates=[(0, 0), (1, 1)])
+    tile_service = MagicMock()
+    tile_service.get_tile_by_position.side_effect = [
+        MagicMock(color="red"),
+        MagicMock(color="green")
+    ]
+
+    # Act & Assert
+    with pytest.raises(HTTPException) as exc_info:
+        check_ban_color(board_id, tile_service, request, ban_color)
+    
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "The tile is of the banned color"
+    
+def test_filter_allowed_figures():
+    # Mock services
+    board_service = MagicMock()
+    tile_service = MagicMock()
+
+    # Mock data
+    match_id = 1
+    ban_color = "red"
+    figures_found = [
+        [Coordinate(0, 0), Coordinate(0, 1)],
+        [Coordinate(1, 0), Coordinate(1, 1)],
+        [Coordinate(2, 0), Coordinate(2, 1)]
+    ]
+
+    # Mock return values
+    board_service.get_ban_color.return_value = ban_color
+    tile_service.get_tile_by_position.side_effect = [
+        MagicMock(color="blue"), MagicMock(color="blue"),
+        MagicMock(color="red"), MagicMock(color="red"),
+        MagicMock(color="green"), MagicMock(color="green")
+    ]
+
+    # Call the function
+    result = filter_allowed_figures(match_id, board_service, figures_found, tile_service)
+
+    # Assertions
+    assert result["key"] == "ALLOW_FIGURES"
+    assert len(result["payload"]) == 2
+    assert result["payload"] == [
+        [Coordinate(0, 0), Coordinate(0, 1)],
+        [Coordinate(1, 0), Coordinate(1, 1)]
+    ]
+
+    # Ensure the mocks were called with expected arguments
+    board_service.get_ban_color.assert_called_once_with(match_id)
+    tile_service.get_tile_by_position.assert_any_call(0, 0, match_id)
+    tile_service.get_tile_by_position.assert_any_call(1, 0, match_id)
+    tile_service.get_tile_by_position.assert_any_call(2, 0, match_id)
