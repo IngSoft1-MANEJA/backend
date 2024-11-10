@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
 from random import shuffle, randint
-
+from uuid import uuid4
 
 from app.cruds.board import BoardService
 from app.connection_manager import manager
@@ -13,6 +13,7 @@ from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.cruds.movement_card import MovementCardService
 from app.cruds.shape_card import ShapeCardService
+from app.cruds.tile import TileService
 from app.exceptions import GameConnectionDoesNotExist, PlayerAlreadyConnected, PlayerNotConnected
 from app.models.enums import *
 from app.models.models import Matches, Players
@@ -20,6 +21,7 @@ from app.schemas import *
 from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS
 from app.logger import logging
+from app.routers.players import filter_allowed_figures
 
 logger = logging.getLogger(__name__)
 
@@ -140,13 +142,14 @@ async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
 
     match1 = match_service.create_match(
         match.lobby_name, match.max_players, match.is_public)
+    token = str(uuid4())
     new_player = player_service.create_player(
-        match.player_name, match1.id, True, match.token)
+        match.player_name, match1.id, True, token)
     manager.create_game_connection(match1.id)
     
     await notify_matches_list(db)
 
-    return {"player_id": new_player.id, "match_id": match1.id}
+    return {"player_id": new_player.id, "match_id": match1.id, "token": token}
 
 
 @router.post("/{match_id}", status_code=200,
@@ -168,8 +171,9 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
     if match.current_players >= match.max_players:
         raise HTTPException(status_code=409, detail="Match is full")
 
+    player_token = str(uuid4())
     player = player_service.create_player(
-        playerJoinIn.player_name, match_id, False, playerJoinIn.token)
+        playerJoinIn.player_name, match_id, False, player_token)
     match.current_players = match.current_players + 1
     players = [player.player_name for player in match.players]
     db.commit()
@@ -181,7 +185,7 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
         
     await notify_matches_list(db)
 
-    return {"player_id": player.id, "players": players}
+    return {"player_id": player.id, "players": players, "token": player_token}
 
 # ==================================== Auxiliares para el inicio de la partida ====================================
 
@@ -369,11 +373,7 @@ async def send_figures_info(match_id: int, player_id: int, db: Session):
     except Exception:
         raise HTTPException(
             status_code=500, detail="Error with formed figures")
-
-    msg = {
-        "key": "ALLOW_FIGURES",
-        "payload": board_figures
-    }
+    msg = filter_allowed_figures(match_id, BoardService(db), board_figures, TileService(db))
 
     await manager.send_to_player(match_id, player_id, msg)
     
@@ -441,8 +441,7 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
 @router.get("/{match_id}/player/{player_id}")
 async def get_match_info_to_player(match_id: int, player_id: int, 
                                    token: Annotated[str, Depends(oauth2_scheme)],
-                                   db: Session = Depends(get_db)
-                                   ):
+                                   db: Session = Depends(get_db)):
     """
         Devuelve informacion de la partida al jugador:
             - Tablero con sus fichas
@@ -457,10 +456,17 @@ async def get_match_info_to_player(match_id: int, player_id: int,
         Returns:
             None, comunica mediante websockets.
     """
+    player_service = PlayerService(db)
     try:
+        player = player_service.get_player_by_id(player_id)
+        if player.token != token:
+            raise HTTPException(status_code=403, detail="Token inválido")
+        
         match = MatchService(db).get_match_by_id(match_id)
-    except Exception as e:
+    except NoResultFound:
         raise HTTPException(status_code=404, detail="Error al obtener información de la partida")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     if match.state == "WAITING":
         await send_waiting_match_info(match_id, player_id, db)
