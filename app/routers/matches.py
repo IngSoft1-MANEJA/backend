@@ -21,7 +21,8 @@ from app.schemas import *
 from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS
 from app.logger import logging
-from app.routers.players import filter_allowed_figures
+from app.cruds.tile import TileService
+from app.cruds.board import BoardService
 
 logger = logging.getLogger(__name__)
 
@@ -373,9 +374,24 @@ async def send_figures_info(match_id: int, player_id: int, db: Session):
     except Exception:
         raise HTTPException(
             status_code=500, detail="Error with formed figures")
-    msg = filter_allowed_figures(match_id, BoardService(db), board_figures, TileService(db))
+    ban_color = board_service.get_ban_color(match_id)
+    filtered_figures = []
+    for figure in board_figures:
+        print(f"Figure coordinates: {figure}")
+        try:
+            tile = tile_service.get_tile_by_position(figure[0].x, figure[0].y, match_id)
+        except NoResultFound:
+            raise HTTPException(status_code=404, detail="Tile with coordinates not found")
+        if tile.color != ban_color:
+            print(f"Tile color: {tile.color}")
+            filtered_figures.append(figure)
 
-    await manager.send_to_player(match_id, player_id, msg)
+    allow_figures_event = {
+        "key": "ALLOW_FIGURES",
+        "payload": filtered_figures
+    }
+
+    await manager.send_to_player(match_id, player_id, allow_figures_event)
     
     
 async def send_waiting_match_info(match_id: int, player_id: int, db: Session):
