@@ -87,31 +87,25 @@ class ConnectionManager:
             index: índice de la conexión a mantener viva.
             on_filter_matches: función para filtrar las partidas.
         """
-        try:
-            while True:
-                try:
-                    response = await self._connections[index]["websocket"].receive_json()
-                except IndexError:
-                    # La conexión ya no existe, salir del bucle
-                    break
+        while True:
+            try:
+                response = await self._connections[index]["websocket"].receive_json()
+            except IndexError:
+                # La conexión ya no existe, salir del bucle
+                break
 
-                if response["key"] == "FILTER_MATCHES":
-                    if "match_name" in response["payload"]:
-                        self._connections[index]["match_name"] = response["payload"]["match_name"]
-                    if "max_players" in response["payload"]:
-                        self._connections[index]["max_players"] = response["payload"]["max_players"]
+            if response["key"] == "FILTER_MATCHES":
+                if "match_name" in response["payload"]:
+                    self._connections[index]["match_name"] = response["payload"]["match_name"]
+                if "max_players" in response["payload"]:
+                    self._connections[index]["max_players"] = response["payload"]["max_players"]
 
-                    filtered_matches = on_filter_matches(self._connections[index]["match_name"], 
-                                                        self._connections[index]["max_players"])
-                    matches = [MatchOut.model_validate(match).model_dump() 
-                            for match in filtered_matches]
-                    msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
-                    await self._connections[index]["websocket"].send_json(msg)
-        except asyncio.CancelledError:
-            # Manejar la cancelación de la tarea si es necesario
-            pass
-        except Exception as e:
-            logger.error("Error en keep_alive_matches: %s", e)    
+                filtered_matches = on_filter_matches(self._connections[index]["match_name"], 
+                                                    self._connections[index]["max_players"])
+                matches = [MatchOut.model_validate(match).model_dump() 
+                        for match in filtered_matches]
+                msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+                await self._connections[index]["websocket"].send_json(msg)
 
 
     def connect_player_to_game(self, game_id: int, player_id: int, websocket: WebSocket):
