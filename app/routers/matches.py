@@ -369,6 +369,8 @@ async def send_movement_cards_info(player_id: int, match_id: int,
 
 async def send_figures_info(match_id: int, player_id: int, db: Session):
     try:
+        board_service = BoardService(db)
+        tile_service = TileService(db)
         match = MatchService(db).get_match_by_id(match_id)
         board_figures = BoardService(db).get_formed_figures(match.board.id)
     except Exception:
