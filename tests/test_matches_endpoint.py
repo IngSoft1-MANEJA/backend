@@ -276,13 +276,17 @@ async def test_get_match_info_to_player(client, db_session):
     match_id = 1
     player_id = 1
 
-    match = MagicMock(id=match_id, board=MagicMock(id=1), current_player_turn=1)
+    match = MagicMock(id=match_id, board=MagicMock(id=1, ban_color="red"), current_player_turn=1)
     player = MagicMock(id=player_id, turn_order=1)
-    board_table = MagicMock()
-    players_in_match = [MagicMock(id=2, player_name="Player 2", turn_order=2), MagicMock(id=3, player_name="Player 3", turn_order=3)]
+    board_table = MagicMock
+    players_in_match = [
+        MagicMock(id=2, player_name="Player 2", turn_order=2),
+        MagicMock(id=3, player_name="Player 3", turn_order=3)
+    ]
     current_player = MagicMock(player_name="Player 1")
     shape_cards = [MagicMock(id=1, shape_type="circle")]
     movement_cards = [MagicMock(id=1, mov_type="move")]
+    board_figures = [MagicMock(id=1, figure_type="triangle")]
 
     with patch('app.routers.matches.MatchService.get_match_by_id', return_value=match), \
          patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
@@ -291,9 +295,9 @@ async def test_get_match_info_to_player(client, db_session):
          patch('app.routers.matches.PlayerService.get_player_by_turn', return_value=current_player), \
          patch('app.routers.matches.ShapeCardService.get_visible_cards', return_value=shape_cards), \
          patch('app.routers.matches.MovementCardService.get_movement_card_by_user', return_value=movement_cards), \
+         patch('app.routers.matches.BoardService.get_formed_figures', return_value=board_figures), \
          patch('app.routers.matches.manager.send_to_player', new_callable=AsyncMock) as mock_send_to_player:
 
-        # Asegúrate de que la ruta es correcta
         response = client.get(f"/matches/{match_id}/player/{player_id}")
         assert response.status_code == status.HTTP_200_OK
 
@@ -304,6 +308,7 @@ async def test_get_match_info_to_player(client, db_session):
                 "board": board_table,
                 "current_turn_player": current_player.player_name,
                 "deck_size": 0,
+                "ban_color": "red",
                 "opponents": [
                     {
                         "player_name": opponent.player_name,
@@ -315,8 +320,6 @@ async def test_get_match_info_to_player(client, db_session):
             }
         }
 
-        mock_send_to_player.assert_any_call(match_id, player_id, msg_info)
-
         msg_shapes = {
             "key": "PLAYER_RECIEVE_ALL_SHAPES",
             "payload": [
@@ -324,14 +327,25 @@ async def test_get_match_info_to_player(client, db_session):
                 for player_i in players_in_match
             ]
         }
-        mock_send_to_player.assert_any_call(match_id, player_id, msg_shapes)
 
         msg_movements = {
             "key": "GET_MOVEMENT_CARD",
             "payload": {"movement_card": [(mov.id, mov.mov_type) for mov in movement_cards]}
         }
-        mock_send_to_player.assert_any_call(match_id, player_id, msg_movements)
 
+        msg_figures = {
+            "key": "ALLOW_FIGURES",
+            "payload": board_figures
+        }
+
+        # Imprimir los valores esperados y reales
+        print("Expected msg_info:", msg_info)
+        print("Actual calls:", mock_send_to_player.call_args_list)
+
+        mock_send_to_player.assert_any_call(match_id, player_id, msg_info)
+        mock_send_to_player.assert_any_call(match_id, player_id, msg_shapes)
+        mock_send_to_player.assert_any_call(match_id, player_id, msg_movements)
+        mock_send_to_player.assert_any_call(match_id, player_id, msg_figures)
 
 @pytest.mark.asyncio
 async def test_start_match_success(client, db_session):
