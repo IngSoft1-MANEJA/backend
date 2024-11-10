@@ -734,7 +734,10 @@ def filter_allowed_figures(match_id: int, board_service: BoardService,
     filtered_figures = []
     for figure in figures_found:
         print(f"Figure coordinates: {figure}")
-        tile = tile_service.get_tile_by_position(figure[0].x, figure[0].y, match_id)
+        try:
+            tile = tile_service.get_tile_by_position(figure[0].x, figure[0].y, match_id)
+        except NoResultFound:
+            raise HTTPException(status_code=404, detail="Tile with coordinates not found")
         if tile.color != ban_color:
             print(f"Tile color: {tile.color}")
             filtered_figures.append(figure)
