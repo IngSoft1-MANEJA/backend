@@ -4,6 +4,8 @@ import app.exceptions as e
 from app.models.enums import Movements
 import pytest
 
+from app.models.models import Matches
+
 def test_create_movement_card_valid(movement_card_service: MovementCardService, db_session):
     currently = db_session.query(MovementCards).count()
     movement_card = movement_card_service.create_movement_card(
@@ -143,3 +145,12 @@ def test_get_movement_cards_by_match(movement_card_service: MovementCardService,
     assert db_session.query(MovementCards).count() == 3
     assert len(movement_card_service.get_movement_card_by_match(match_id=1)) == 2
     assert len(movement_card_service.get_movement_card_by_match(match_id=2)) == 1
+
+def test_create_movement_deck_success(movement_card_service: MovementCardService, load_matches, db_session):
+    match = db_session.query(Matches).filter(Matches.id == 1).first()
+    movement_card_service.create_movement_deck(match.id)
+    assert len(match.movement_cards) == 49
+    
+def test_create_movement_deck_invalid(movement_card_service: MovementCardService, load_matches, db_session):
+    with pytest.raises(Exception):
+        movement_card_service.create_movement_deck(9999)

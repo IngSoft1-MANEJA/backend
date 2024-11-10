@@ -24,7 +24,7 @@ from app.models.models import *
 from app.routers import matches, players
 
 basedir = os.path.abspath(os.path.dirname(__file__))
-
+os.environ["TURN_TIMER"] = "1"
 
 @pytest.fixture
 def db_session():

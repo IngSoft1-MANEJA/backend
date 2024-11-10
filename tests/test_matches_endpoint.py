@@ -1,20 +1,13 @@
-from random import seed
+from datetime import datetime
 from unittest import mock
 import pytest
 from sqlalchemy.orm import Session
-from sqlalchemy.orm.exc import NoResultFound
 from fastapi import status
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from app.cruds.board import BoardService
-from app.cruds.match import MatchService
-from app.cruds.player import PlayerService
-from app.cruds.movement_card import MovementCardService
-from app.models import Matches, Players, MovementCards
+from app.models import Matches, Players
 from app.connection_manager import manager
-from app.models.models import Boards, Tiles
-from app.routers.matches import (create_movement_deck, 
-                                 give_movement_card_to_player, 
+from app.routers.players import (give_movement_card_to_player, 
                                  notify_movement_card_to_player, 
                                  notify_all_players_movements_received, 
                                  give_shape_card_to_player)
@@ -35,7 +28,6 @@ def test_create_match(client, db_session):
     assert "player_id" in data
     assert "match_id" in data
 
-    # Verifica que el match y el player se hayan creado en la base de datos
     match = db_session.query(Matches).filter(
         Matches.id == data["match_id"]).first()
     assert match is not None
@@ -53,7 +45,6 @@ def test_create_match(client, db_session):
 
 
 def test_create_match_invalid_data(client):
-    # Prueba con datos inválidos
     response = client.post(
         "/matches/",
         json={
@@ -64,7 +55,7 @@ def test_create_match_invalid_data(client):
             "token": ""
         }
     )
-    assert response.status_code == 422  # Unprocessable Entity
+    assert response.status_code == 422 
 
 
 def test_get_matches(client):
@@ -85,7 +76,6 @@ def test_get_matches_by_max_players(client):
     assert isinstance(response.json(), list)
     
 def test_get_match_by_id(client):
-    # Primero, crea un match para obtener su ID
     response = client.post(
         "/matches/",
         json={
@@ -141,7 +131,7 @@ def test_join_match_is_full(client):
 
 def test_start_match_success(client, load_matches):
     manager.create_game_connection(1)
-    with client.websocket_connect("/matches/1/ws/1") as ws1, client.websocket_connect("/matches/1/ws/2") as ws2:
+    with client.websocket_connect("/matches/1/ws/1") as ws1, client.websocket_connect("/matches/1/ws/2") as ws2, patch("app.routers.players.turn_timeout") as mock_turn_timeout:
         response = client.patch("/matches/1/start/1")
         assert response.status_code == 200
         data = ws1.receive_json()
@@ -155,14 +145,6 @@ def test_start_match_not_enough_players(client, load_data_for_test):
         response = client.patch("/matches/1/start/1")
         assert response.status_code == 404
 
-def test_create_movement_deck_success(client, load_matches, db_session):
-    match = db_session.query(Matches).filter(Matches.id == 1).first()
-    create_movement_deck(db_session, match.id)
-    assert len(match.movement_cards) == 49
-    
-def test_create_movement_deck_invalid(client, load_matches, db_session):
-    with pytest.raises(Exception):
-        create_movement_deck(999999)
 
 @pytest.mark.asyncio
 async def test_notify_movement_card_to_player():
@@ -275,8 +257,7 @@ def test_give_movement_card_to_player_no_cards():
 async def test_get_match_info_to_player(client, db_session):
     match_id = 1
     player_id = 1
-
-    match = MagicMock(id=match_id, board=MagicMock(id=1, ban_color="red"), current_player_turn=1)
+    match = MagicMock(id=match_id, board=MagicMock(id=1, ban_color="red"), current_player_turn=1, started_turn_time= datetime.now())
     player = MagicMock(id=player_id, turn_order=1)
     board_table = MagicMock
     players_in_match = [
@@ -316,7 +297,8 @@ async def test_get_match_info_to_player(client, db_session):
                     }
                     for opponent in players_in_match
                     if opponent.id != player_id
-                ]
+                ],
+                "turn_started": match.started_turn_time.isoformat()
             }
         }
 
@@ -348,7 +330,7 @@ async def test_get_match_info_to_player(client, db_session):
         mock_send_to_player.assert_any_call(match_id, player_id, msg_figures)
 
 @pytest.mark.asyncio
-async def test_start_match_success(client, db_session):
+async def test_start_match_success2(client):
     match_id = 1
     player_id = 1
 
@@ -357,21 +339,20 @@ async def test_start_match_success(client, db_session):
 
     with patch('app.routers.matches.MatchService.get_match_by_id', return_value=match), \
          patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
-         patch('app.routers.matches.create_movement_deck'), \
+         patch('app.routers.matches.MovementCardService.create_movement_deck'), \
          patch('app.routers.matches.ShapeCardService.create_shape_card'), \
          patch('app.routers.matches.BoardService.create_board', return_value=MagicMock(id=1)), \
          patch('app.routers.matches.BoardService.init_board'), \
          patch('app.routers.matches.MatchService.set_players_order'), \
          patch('app.routers.matches.manager.send_to_player', new_callable=AsyncMock) as mock_send_to_player, \
          patch('app.routers.matches.give_movement_card_to_player'), \
-         patch('app.routers.matches.give_shape_card_to_player', new_callable=AsyncMock):
+         patch('app.routers.matches.give_shape_card_to_player', new_callable=AsyncMock), \
+        patch("app.routers.matches.turn_timeout") as turn_timeout:
 
         response = client.patch(f"/matches/{match_id}/start/{player_id}")
         assert response.status_code == status.HTTP_200_OK
 
-        # Verificar que el estado del match se haya actualizado
         assert match.state == "STARTED"
 
-        # Verificar que se hayan enviado los mensajes correctos a los jugadores
         for player in match.players:
             mock_send_to_player.assert_any_call(match_id, player.id, {"key": "START_MATCH", "payload": {}})

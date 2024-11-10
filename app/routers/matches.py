@@ -1,12 +1,20 @@
+from datetime import datetime
+from typing import Optional
+from fastapi import APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from typing import Optional, Annotated
-from fastapi import (APIRouter, Query, WebSocket, WebSocketDisconnect, Depends, 
-                     HTTPException, Security)
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import (APIRouter, WebSocket, WebSocketDisconnect, Depends, 
+                     HTTPException)
 from sqlalchemy.orm.exc import NoResultFound
 from sqlalchemy.orm import Session
-from random import shuffle, randint
+from random import shuffle
+from starlette.background import BackgroundTasks
 
-
+from app.routers.players import (give_movement_card_to_player,
+                                 give_shape_card_to_player,
+                                 notify_movement_card_to_player, on_filter_matches,
+                                 turn_timeout,
+                                 notify_matches_list)
 from app.cruds.board import BoardService
 from app.connection_manager import manager
 from app.cruds.match import MatchService
@@ -15,7 +23,6 @@ from app.cruds.movement_card import MovementCardService
 from app.cruds.shape_card import ShapeCardService
 from app.exceptions import GameConnectionDoesNotExist, PlayerAlreadyConnected, PlayerNotConnected
 from app.models.enums import *
-from app.models.models import Matches, Players
 from app.schemas import *
 from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS
@@ -76,50 +83,6 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
         except PlayerNotConnected:
             # El jugador ya ha sido desconectado, no hacer nada
             pass
-
-async def notify_matches_list(db):
-    try:
-        for conn in manager._connections:
-            filtered_matches = on_filter_matches(conn["match_name"], 
-                                                 conn["max_players"], db)
-            matches = [MatchOut.model_validate(match).model_dump() 
-                    for match in filtered_matches]
-            msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
-            await conn["websocket"].send_json(msg)
-        
-    except Exception as e:
-        logger.error("Error al enviar mensaje: %s", e)
-
-
-def on_filter_matches(
-    match_name: Optional[str],
-    max_players: Optional[int],
-    db: Session
-):
-    """
-        Obtiene todas las partidas que coincidan con los filtros, si no tiene
-        filtros devuelve todas las partidas disponibles.
-        Args:
-            - s : string a buscar en el nombre de la partida.
-            - max_players : cantidad máxima de jugadores en la partida.
-            - db : Session de la base de datos.
-        Returns:
-            - Lista de partidas en esquema MatchOut.
-    """
-    matches = MatchService(db).get_all_matches(True)
-
-    if not match_name and not max_players:
-        return matches
-
-    filtered_matches = matches
-    if match_name:
-        filtered_matches = [
-            match for match in filtered_matches if match_name.lower() in match.match_name.lower()]
-    if max_players:
-        filtered_matches = [
-            match for match in filtered_matches if match.max_players == max_players]
-
-    return filtered_matches
 
 
 @router.get("/{match_id}", response_model=MatchOut)
@@ -182,109 +145,9 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
 
     return {"player_id": player.id, "players": players}
 
-# ==================================== Auxiliares para el inicio de la partida ====================================
-
-
-def create_movement_deck(db: Session, match_id: int):
-    movement_service = MovementCardService(db)
-
-    for mov in Movements:  # Por cada tipo de enum
-        for _ in range(7):
-            movement_service.create_movement_card(mov.value, match_id)
-
-
-def give_movement_card_to_player(player_id: int, db: Session) -> list[tuple[int, str]]:
-    """
-    Da hasta 3 cartas de movimiento al jugador.
-    Args:
-        - player_id : id del jugador.
-        - db : Session de la base de datos.
-    Returns:
-        Lista de cartas dadas al jugador.
-    """
-    player_service = PlayerService(db)
-    movement_service = MovementCardService(db)
-
-    player = player_service.get_player_by_id(player_id)
-    match_id = player.match_id
-    list_movs = player.movement_cards
-    movs_to_give = 3 - len(list_movs)
-    movements_given = []
-
-    while movs_to_give > 0:
-        movements = movement_service.get_movement_cards_without_owner(match_id)
-        if not movements:
-            break  # No hay más cartas en el mazo
-        movement = movements[randint(0, len(movements) - 1)]
-        movement_service.add_movement_card_to_player(player_id, movement.id)
-        movements_given.append((movement.id, movement.mov_type))
-        movs_to_give -= 1
-
-    return movements_given
-
-
-async def notify_movement_card_to_player(player_id: int, match_id: int, buff_movement: list[tuple[int, str]]):
-    """
-        Notifica al jugador que se le dio una carta de movimiento.
-        Args:
-            - player_id : id del jugador.
-            - match_id : id de la partida.
-            - buff_movement : lista de tuplas con el id y tipo de movimiento.
-        Returns:
-            None, se comunica mediante websockets.
-    """
-    msg_user = {"key": "GET_MOVEMENT_CARD",
-                "payload": {"movement_card": buff_movement}}
-    await manager.send_to_player(match_id, player_id, msg_user)
-
-
-async def notify_all_players_movements_received(player: Players, match: Matches):
-    """
-        Notifica a los demás jugadores que un jugador recibió una carta de movimiento.
-        Args:
-            - player : jugador que recibió la carta.
-            - match : partida en la que se encuentra.
-        Returns:
-            None, se comunica mediante websockets.
-    """
-    for player_i in match.players:
-        if player_i.id != player.id:
-            msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
-                       "payload": {"player": player.player_name}}
-            await manager.send_to_player(match.id, player_i.id, msg_all)
-
-
-async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
-    """
-        Da hasta 3 cartas de figuras al jugador.
-
-        Args:
-            - player_id : id del jugador.
-            - db : Session de la base de datos.
-            - is_init : booleano que indica si es el inicio de la partida.
-    """
-    player = PlayerService(db).get_player_by_id(player_id)
-    visible_cards = ShapeCardService(db).get_visible_cards(player_id, True)
-    ShapeDeck = ShapeCardService(db).get_visible_cards(player_id, False)
-    CardsToGive = 3 - len(visible_cards)
-    ShapesGiven = []
-
-    for i in range(CardsToGive):
-        if not ShapeDeck:
-            break  # No hay más cartas en el mazo
-        shape = ShapeDeck.pop(randint(0, len(ShapeDeck) - 1))
-        ShapeCardService(db).update_shape_card(shape.id, True, "NOT_BLOCKED")
-        ShapesGiven.append((shape.id, shape.shape_type))
-
-    if not is_init:
-        msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
-                   "payload": [{"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}]}
-        await manager.broadcast_to_game(player.match_id, msg_all)
-# =============================================================================================================
-
 
 @router.patch("/{match_id}/start/{player_id}", status_code=200)
-async def start_match(match_id: int, player_id: int, db: Session = Depends(get_db)):
+async def start_match(match_id: int, player_id: int, db: Session = Depends(get_db), background_tasks = BackgroundTasks()):
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
@@ -299,7 +162,8 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
         if player.is_owner and player.match_id == match_id:
             match.state = MatchState.STARTED.value
-            create_movement_deck(db, match_id)  # crea el mazo movs
+            match.started_turn_time = datetime.now()
+            movement_service.create_movement_deck(match_id)
 
             # ===================== Configuro los mazos ==================================
             shapes = [(shape.value, True) for shape in HardShapes] * 2
@@ -326,8 +190,8 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
                 give_movement_card_to_player(player_i.id, db)
                 await give_shape_card_to_player(player_i.id, db, True)
-
-            return {"message": "Match started successfully"}
+            background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
+            return JSONResponse({"message": "Match started successfully"}, background=background_tasks)
 
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
@@ -357,7 +221,7 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
         players_in_match = PlayerService(db).get_players_by_match(match_id)
         deck_size = ShapeCardService(db).get_deck_size(player_id)
     except Exception as e:
-        print(f"Error al obtener informacion de la partida: {e}")
+        logger.error("Error al obtener informacion de la partida: %s", e)
         raise HTTPException(
             status_code=404, detail="Error al obtener informacion de la partida")
 
@@ -378,7 +242,8 @@ async def get_match_info_to_player(match_id: int, player_id: int, db: Session = 
                 }
                 for opponent in players_in_match
                 if opponent.id != player_id
-            ]
+            ],
+            "turn_started": match.started_turn_time.isoformat()
         }
     }
     await manager.send_to_player(match_id, player_id, msg_info)
