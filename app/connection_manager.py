@@ -4,9 +4,13 @@ from typing import Any, Callable, Dict, List, Union
 from app.exceptions import *
 from app.schemas import MatchOut
 
+import asyncio
+from app.logger import logging
+
+logger = logging.getLogger(__name__)
 
 class ConnectionManager:
-    def _init_(self) -> None:
+    def __init__(self) -> None:
         self._games: Dict[int, Dict[int, WebSocket]] = {}
         self._connections: List[Dict[str, Union[str, int, WebSocket]]] = []
 
@@ -64,35 +68,38 @@ class ConnectionManager:
         while True:
             await websocket.receive_text()
 
-    async def keep_alive_matches(self, index: int, on_filter_matches: Callable):
-        """Keeps websocket connections alive
-
-        Args:
-            index: index of the connection to keep alive.
-            {
-                "key" : "filter_matchEs"
-                "payload" : {
-                    "match_name": STR,
-                    o
-                    "max_players": INT,
-                }
-            }
+    async def keep_alive_matches(self, index, on_filter_matches):
         """
-        while True:
-            response = await self._connections[index]["websocket"].receive_json()
-            
-            if response["key"] == "FILTER_MATCHES":
-                if "match_name" in response["payload"]:
-                    self._connections[index]["match_name"] = response["payload"]["match_name"]
-                if "max_players" in response["payload"]:
-                    self._connections[index]["max_players"] = response["payload"]["max_players"]
+        Mantiene viva la conexión del websocket y filtra las partidas.
+        Args:
+            index: índice de la conexión a mantener viva.
+            on_filter_matches: función para filtrar las partidas.
+        """
+        try:
+            while True:
+                try:
+                    response = await self._connections[index]["websocket"].receive_json()
+                except IndexError:
+                    # La conexión ya no existe, salir del bucle
+                    break
 
-                filtered_matches = on_filter_matches(self._connections[index]["match_name"], 
-                                                     self._connections[index]["max_players"])
-                matches = [MatchOut.model_validate(match).model_dump() 
-                        for match in filtered_matches]
-                msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
-                await self._connections[index]["websocket"].send_json(msg)            
+                if response["key"] == "FILTER_MATCHES":
+                    if "match_name" in response["payload"]:
+                        self._connections[index]["match_name"] = response["payload"]["match_name"]
+                    if "max_players" in response["payload"]:
+                        self._connections[index]["max_players"] = response["payload"]["max_players"]
+
+                    filtered_matches = on_filter_matches(self._connections[index]["match_name"], 
+                                                        self._connections[index]["max_players"])
+                    matches = [MatchOut.model_validate(match).model_dump() 
+                            for match in filtered_matches]
+                    msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+                    await self._connections[index]["websocket"].send_json(msg)
+        except asyncio.CancelledError:
+            # Manejar la cancelación de la tarea si es necesario
+            pass
+        except Exception as e:
+            logger.error("Error en keep_alive_matches: %s", e)    
 
 
     def connect_player_to_game(self, game_id: int, player_id: int, websocket: WebSocket):
