@@ -225,7 +225,10 @@ class BoardService:
         Args:
             board_id: Id del tablero.
         Returns:
-            ban_color: Color prohibido.
+            ban_color: Color prohibido o None si no se encuentra el tablero.
         """
-        board = self.db.query(Boards).filter(Boards.id == board_id).one()
-        return board.ban_color
+        try:
+            board = self.db.query(Boards).filter(Boards.id == board_id).one()
+            return board.ban_color
+        except NoResultFound:
+            return None
