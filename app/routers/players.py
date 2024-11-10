@@ -649,6 +649,11 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
     except ValueError:
         raise HTTPException(status_code=404, detail="Player not found")
 
+    try:
+        board = board_service.get_board_by_match_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Board not found")
+    
     if player.turn_order != match.current_player_turn:
         raise HTTPException(
             status_code=403, detail=f"It's not player {player.player_name}'s turn")
@@ -759,7 +764,10 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
         player = player_service.get_player_by_id(player_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="Player not found")
-
+    try:
+        board = board_service.get_board_by_match_id(match_id)
+    except NoResultFound:
+        raise HTTPException(status_code=404, detail="Board not found")
     if player.turn_order != match.current_player_turn:
         raise HTTPException(
             status_code=403, detail=f"It's not player {player.player_name}'s turn")
