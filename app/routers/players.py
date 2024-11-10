@@ -315,6 +315,10 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     
     if not cant_draw:
         await give_shape_card_to_player(player.id, db, is_init=False)
+    else: 
+        msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
+                   "payload": []}
+        await manager.broadcast_to_game(player.match_id, msg_all)
 
     msg = {
         "key": "END_PLAYER_TURN",
@@ -566,7 +570,7 @@ async def undo_partials_movements(board, player_id, match_id, db: Session = Depe
         tile_service.update_tile_position(
             tile2.id, aux_tile.position_x, aux_tile.position_y)
 
-    for _ in board.temporary_movements:
+    for i in range(len(board.temporary_movements)):
         last_movement = board_service.get_last_temporary_movements(
             board.id)
     
