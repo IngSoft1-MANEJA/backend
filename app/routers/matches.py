@@ -8,25 +8,40 @@ from random import shuffle, randint
 
 
 from app.cruds.board import BoardService
-from app.exceptions import *
 from app.connection_manager import manager
 from app.cruds.match import MatchService
 from app.cruds.player import PlayerService
 from app.cruds.movement_card import MovementCardService
 from app.cruds.shape_card import ShapeCardService
+from app.exceptions import GameConnectionDoesNotExist, PlayerAlreadyConnected, PlayerNotConnected
 from app.models.enums import *
 from app.models.models import Matches, Players
 from app.schemas import *
 from app.database import get_db
-from app.utils.utils import MAX_SHAPE_CARDS, FIGURE_COORDINATES
+from app.utils.utils import MAX_SHAPE_CARDS
 from app.logger import logging
-from app.utils.board_shapes_algorithm import Figure, find_board_figures, Board
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/matches")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
+@router.websocket("/ws")
+async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
+    match_service = MatchService(db)
+    await websocket.accept()
+    try:
+        manager.add_anonymous_connection(websocket)
+        matches = match_service.get_all_matches(True)
+        matches = [MatchOut.model_validate(match).model_dump() 
+                   for match in matches]
+        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+        await websocket.send_json(msg)
+        await manager.keep_alive(websocket)
+    except WebSocketDisconnect:
+        manager.remove_anonymous_connection(websocket)
+    except Exception as e:
+        logger.error("Error al enviar mensaje: %s", e)
 
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket, db: Session = Depends(get_db)):
@@ -62,6 +77,16 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
             # El jugador ya ha sido desconectado, no hacer nada
             pass
 
+async def notify_matches_list(db):
+    match_service = MatchService(db)
+    try:
+        matches = match_service.get_all_matches(True)
+        matches = [MatchOut.model_validate(match).model_dump() 
+                for match in matches]
+        msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+        await manager.broadcast(msg)
+    except Exception as e:
+        logger.error("Error al enviar mensaje: %s", e)
 
 @router.get("/", response_model=list[MatchOut])
 def get_matches(
@@ -106,7 +131,7 @@ def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", status_code=200)
-def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
+async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
 
@@ -115,33 +140,45 @@ def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     new_player = player_service.create_player(
         match.player_name, match1.id, True, match.token)
     manager.create_game_connection(match1.id)
+    
+    await notify_matches_list(db)
 
     return {"player_id": new_player.id, "match_id": match1.id}
 
 
-@router.post("/{match_id}")
+@router.post("/{match_id}", status_code=200,
+             response_model=PlayerJoinOut,
+             responses={404: {"description": "Match not found"},
+                        409: {"description": "Match is full"}})
 async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
-    try:
-        match_service = MatchService(db)
-        match = match_service.get_match_by_id(match_id)
-        if match.current_players >= match.max_players:
-            raise HTTPException(status_code=404, detail="Match is full")
-        player_service = PlayerService(db)
-        player = player_service.create_player(
-            playerJoinIn.player_name, match_id, False, playerJoinIn.token)
-        match.current_players = match.current_players + 1
-        players = [player.player_name for player in match.players]
-        db.commit()
-        msg = {"key": "PLAYER_JOIN", "payload": {"name": player.player_name}}
+    """
+    Create a player and add them to the match.
+    """
+    match_service = MatchService(db)
+    player_service = PlayerService(db)
 
-        try:
-            await manager.broadcast_to_game(match_id, msg)
-        except Exception as e:
-            print(f"Error al enviar mensaje: {e}")
-        return {"player_id": player.id, "players": players}
+    try:
+        match = match_service.get_match_by_id(match_id)
+    except NoResultFound as e:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    if match.current_players >= match.max_players:
+        raise HTTPException(status_code=409, detail="Match is full")
+
+    player = player_service.create_player(
+        playerJoinIn.player_name, match_id, False, playerJoinIn.token)
+    match.current_players = match.current_players + 1
+    players = [player.player_name for player in match.players]
+    db.commit()
+    msg = {"key": "PLAYER_JOIN", "payload": {"name": player.player_name}}
+    try:
+        await manager.broadcast_to_game(match_id, msg)
     except Exception as e:
-        print("el error cuando se quiere unir es: ", e)
-        raise HTTPException(status_code=500, detail="Error DB")
+        logger.error("Error al enviar mensaje: %s", e)
+        
+    await notify_matches_list(db)
+
+    return {"player_id": player.id, "players": players}
 
 # ==================================== Auxiliares para el inicio de la partida ====================================
 
@@ -234,7 +271,7 @@ async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
         if not ShapeDeck:
             break  # No hay más cartas en el mazo
         shape = ShapeDeck.pop(randint(0, len(ShapeDeck) - 1))
-        ShapeCardService(db).update_shape_card(shape.id, True, False)
+        ShapeCardService(db).update_shape_card(shape.id, True, "NOT_BLOCKED")
         ShapesGiven.append((shape.id, shape.shape_type))
 
     if not is_init:
@@ -358,19 +395,29 @@ async def send_waiting_match_info(match_id: int, player_id: int, db: Session):
 
 
 async def send_active_match_info(match_id: int, player_id: int, db: Session):
-    s_service = ShapeCardService(db)
-    m_service = MovementCardService(db)
-    board_table = BoardService(db).get_board_table(match_id)
-    match = MatchService(db).get_match_by_id(match_id)
-    current_player = PlayerService(db).get_player_by_turn(match.current_player_turn, match_id)
-    players_in_match = PlayerService(db).get_players_by_match(match_id)
-    
+    try:
+        p_service = PlayerService(db)
+        m_service = MatchService(db)
+        s_service = ShapeCardService(db)
+        match = m_service.get_match_by_id(match_id)
+        player = p_service.get_player_by_id(player_id)
+        board_table = BoardService(db).get_board_table(match.board.id)
+        players_in_match = p_service.get_players_by_match(match_id)
+        deck_size = ShapeCardService(db).get_deck_size(player_id)
+        current_player = p_service.get_current_player(match_id)
+    except Exception as e:
+        print(f"Error al obtener informacion de la partida: {e}")
+        raise HTTPException(
+            status_code=404, detail="Error al obtener informacion de la partida")
+
     msg_info = {
         "key": "GET_PLAYER_MATCH_INFO",
         "payload": {
-            "turn_order": current_player.turn_order,
+            "turn_order": player.turn_order,
             "board": board_table,
             "current_turn_player": current_player.player_name,
+            "deck_size": deck_size,
+            "ban_color": match.board.ban_color,
             "opponents": [
                 {
                     "player_name": opponent.player_name,

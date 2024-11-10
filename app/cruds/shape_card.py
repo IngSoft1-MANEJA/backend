@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 
 from app.models.models import ShapeCards
+from app.models.enums import IsBlocked
 from app.utils.utils import validate_shape, validate_add_shape_card_to_hand
 
 
@@ -33,7 +34,7 @@ class ShapeCardService():
         """
         validate_shape(shape)
         shape_card = ShapeCards(shape_type=shape, is_hard=is_hard, is_visible=is_visible,
-                                is_blocked=False, player_owner=player_owner)
+                                is_blocked= IsBlocked.NOT_BLOCKED.name, player_owner=player_owner)
         self.db.add(shape_card)
         self.db.commit()
         self.db.refresh(shape_card)
@@ -129,7 +130,7 @@ class ShapeCardService():
             raise NoResultFound(
                 f"ShapeCard with id {shape_card_id} not found, can't add")
 
-    def update_shape_card(self, shape_card_id: int, is_visible: bool, is_blocked: bool):
+    def update_shape_card(self, shape_card_id: int, is_visible: bool, is_blocked: IsBlocked):
         """
             Actualiza los atributos de una carta de figura.
 
@@ -162,3 +163,15 @@ class ShapeCardService():
         # REVISAR CUANDO SEA 0
         except NoResultFound:
             raise NoResultFound(f"Player with id {player_id} has not visible cards")
+    
+    def get_deck_size(self, player_id: int) -> int:
+        """
+            Obtiene el tamaÃ±o del mazo de un jugador.
+            Args:
+                - player_id : id del jugador.
+        """
+        try:
+            deck_size = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).count()
+            return deck_size
+        except NoResultFound:
+            raise NoResultFound(f"Player with id {player_id} has not shape cards")

@@ -13,9 +13,9 @@ def test_get_shape_cards(shape_service: ShapeCardService, db_session):
     try:
         list_shape_cards = [
             {'shape_type': 1, 'hard': False, 'visible': True,
-                'blocked': False, 'player_owner': 1},
+                'blocked': "NOT_BLOCKED", 'player_owner': 1},
             {'shape_type': 3, 'hard': True, 'visible': False,
-                'blocked': False, 'player_owner': 2}
+                'blocked': "NOT_BLOCKED", 'player_owner': 2}
         ]
         for shape_card in list_shape_cards:
             new_shape_card = ShapeCards(shape_type=shape_card['shape_type'], is_hard=shape_card['hard'],
@@ -61,10 +61,10 @@ def test_update_shape_card(shape_service: ShapeCardService):
         shape=15, is_hard=False, is_visible=True, player_owner=1)
     shape_card_id = shape_service.get_shape_card_id(shape_card)
     shape_service.update_shape_card(shape_card_id, is_visible=False,
-                                    is_blocked=True)
+                                    is_blocked="BLOCKED")
     shape_card2 = shape_service.get_shape_card_by_id(shape_card_id)
     assert shape_card2.is_visible == False
-    assert shape_card2.is_blocked == True
+    assert shape_card2.is_blocked == "BLOCKED"
 
 
 def test_delete_shape_card(shape_service: ShapeCardService, db_session):
@@ -109,7 +109,7 @@ def test_get_shape_cards_by_player(shape_service: ShapeCardService, db_session):
     assert shape_cards[0].shape_type == 3
     assert shape_cards[0].is_hard == False
     assert shape_cards[0].is_visible == True
-    assert shape_cards[0].is_blocked == False
+    assert shape_cards[0].is_blocked == "NOT_BLOCKED"
     assert shape_cards[0].player_owner == player_id
 
 
@@ -117,25 +117,25 @@ def test_update_shape_card(shape_service: ShapeCardService, db_session):
     shape_card = shape_service.create_shape_card(shape=15, is_hard=True, is_visible= False, player_owner=1)
     shape_card_id = shape_service.get_shape_card_id(shape_card)
 
-    shape_service.update_shape_card(shape_card_id, is_visible= True, is_blocked=False)
+    shape_service.update_shape_card(shape_card_id, is_visible= True, is_blocked="NOT_BLOCKED")
 
     shape_card2 = shape_service.get_shape_card_by_id(shape_card_id)
 
     assert shape_card2.is_visible == True
-    assert shape_card2.is_blocked == False 
+    assert shape_card2.is_blocked == "NOT_BLOCKED" 
     
-    shape_service.update_shape_card(shape_card_id, is_visible= True, is_blocked= True)
+    shape_service.update_shape_card(shape_card_id, is_visible= True, is_blocked= "BLOCKED")
 
     shape_card3 = shape_service.get_shape_card_by_id(shape_card_id)
 
     assert shape_card3.is_visible == True
-    assert shape_card3.is_blocked == True 
+    assert shape_card3.is_blocked == "BLOCKED" 
     
 
 def test_update_shape_card_not_found(shape_service: ShapeCardService):
     shape_card_id = 999  # ID que no existe
     is_visible = True
-    is_blocked = False
+    is_blocked = "NOT_BLOCKED"
     
     with pytest.raises(NoResultFound, match=f"ShapeCard with id {shape_card_id} not found, can't update"):
         shape_service.update_shape_card(shape_card_id, is_visible, is_blocked)

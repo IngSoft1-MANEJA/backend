@@ -69,6 +69,7 @@ async def test_end_turn_success(client, setup_mocks, db_session):
     mocks["mock_broadcast_to_game"].assert_called_once_with(1, {
         "key": "END_PLAYER_TURN", 
         "payload": {
+            "current_player_turn": 1,
             "current_player_name": "Player 1",
             "next_player_name": "Player 2",
             "next_player_turn": 2
@@ -128,6 +129,7 @@ def test_end_turn_logic_max_turn(setup_mocks, client, db_session):
     mocks["mock_broadcast_to_game"].assert_called_once_with(1, {
         "key": "END_PLAYER_TURN",
         "payload": {
+            "current_player_turn": 1,
             "current_player_name": "Player 1",
             "next_player_name": "Player 2",
             "next_player_turn": 2
