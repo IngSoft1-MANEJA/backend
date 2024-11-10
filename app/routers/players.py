@@ -316,9 +316,11 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     
     if not cant_draw:
         await give_shape_card_to_player(player.id, db, is_init=False)
-    else: 
+    else:
         msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
-                   "payload": []}
+                   "payload": [{"player": player.player_name, 
+                                "turn_order": player.turn_order, 
+                                "shape_cards": []}]}
         await manager.broadcast_to_game(player.match_id, msg_all)
 
     msg = {
