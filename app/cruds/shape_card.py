@@ -2,7 +2,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 
-from app.models.models import ShapeCards
+from app.models.models import Players, ShapeCards
 from app.models.enums import IsBlocked
 from app.utils.utils import validate_shape, validate_add_shape_card_to_hand
 
@@ -182,17 +182,23 @@ class ShapeCardService():
 
     def get_blocked_cards(self, match_id: int) -> List[int]:
         """
-            Devuelve el id de todas las cartass bloqueadas del match
+            Devuelve el id de todas las cartas bloqueadas del match
             Args:
                 - match_id : id del match
         """
         try:
-            cards = self.db.query(ShapeCards).filter(ShapeCards.match_id == match_id).filter(
-                ShapeCards.is_blocked == IsBlocked.BLOCKED.name).all()
-            id_cards= []
+            # Obtener todos los jugadores del match
+            players = self.db.query(Players.id).filter(Players.match_id == match_id).all()
+            player_ids = [player.id for player in players]
+            
+            # Obtener todas las cartas bloqueadas de esos jugadores
+            cards = self.db.query(ShapeCards).filter(
+                ShapeCards.player_owner.in_(player_ids),
+                ShapeCards.is_blocked == IsBlocked.BLOCKED.name
+            ).all()
+            
             # Solo necesitamos los ids
-            for card in cards:
-                id_cards.append(card.id)
+            id_cards = [card.id for card in cards]
             return id_cards
         except NoResultFound:
             return []
