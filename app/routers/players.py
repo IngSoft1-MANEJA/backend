@@ -632,12 +632,9 @@ async def undo_partials_movements(board, player_id, match_id, db: Session = Depe
 async def unlock_figures(shape_card: ShapeCards, player_id, match_id, db):
     shape_card_service = ShapeCardService(db)
     visible_cards = shape_card_service.get_visible_cards(player_id, True)
-    print("antes del if, carta", shape_card.id, shape_card.shape_type)
     if shape_card.is_blocked == "NOT_BLOCKED":
         for card in visible_cards:
-            print("carta iterando", card.id, card.shape_type, card.is_blocked)
             if card.is_visible == True and card.is_blocked == "BLOCKED" and len(visible_cards) == 2:
-                print("carta dentro del if", card.id, card.shape_type, card.is_blocked)
                 shape_card_service.update_shape_card(card.id, True, "UNLOCKED")
                 msg = {"key": "UNLOCK_FIGURE", "payload": { "figure_id": card.id }}
                 await manager.broadcast_to_game(match_id, msg)
