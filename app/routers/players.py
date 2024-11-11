@@ -991,7 +991,12 @@ async def block_figure(match_id: int, player_id: int, request: UseFigure, db: Se
         raise HTTPException(status_code=404, detail="Figure Card not found")
 
     players = player_service.get_players_by_match(match_id)
-    player_owner = player_service.get_player_by_id(shape_card.player_owner)
+    
+    try:
+        player_owner = player_service.get_player_by_id(shape_card.player_owner)
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Player doesent exist")
+
     if not shape_card.is_visible or player_owner not in players:
         raise HTTPException(
             status_code=404, detail="Figure card doesn't belong to this match")
