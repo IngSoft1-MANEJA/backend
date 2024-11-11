@@ -425,7 +425,7 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
         board_table = BoardService(db).get_board_table(match.board.id)
         players_in_match = p_service.get_players_by_match(match_id)
         deck_size = ShapeCardService(db).get_deck_size(player_id)
-        current_player = p_service.get_current_player(match_id)
+        current_player = p_service.get_player_by_turn(match.current_player_turn)
     except Exception as e:
         print(f"Error al obtener informacion de la partida: {e}")
         raise HTTPException(
