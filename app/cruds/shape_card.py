@@ -34,7 +34,7 @@ class ShapeCardService():
         """
         validate_shape(shape)
         shape_card = ShapeCards(shape_type=shape, is_hard=is_hard, is_visible=is_visible,
-                                is_blocked= IsBlocked.NOT_BLOCKED.name, player_owner=player_owner)
+                                is_blocked=IsBlocked.NOT_BLOCKED.name, player_owner=player_owner)
         self.db.add(shape_card)
         self.db.commit()
         self.db.refresh(shape_card)
@@ -157,13 +157,15 @@ class ShapeCardService():
                 - is_visible : booleano que indica si las cartas deseadas son visibles o no.
         """
         try:
-            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(ShapeCards.is_visible == is_visible).all()
+            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(
+                ShapeCards.is_visible == is_visible).all()
             return cards
-        
+
         # REVISAR CUANDO SEA 0
         except NoResultFound:
-            raise NoResultFound(f"Player with id {player_id} has not visible cards")
-    
+            raise NoResultFound(
+                f"Player with id {player_id} has not visible cards")
+
     def get_deck_size(self, player_id: int) -> int:
         """
             Obtiene el tamaÃ±o del mazo de un jugador.
@@ -171,19 +173,26 @@ class ShapeCardService():
                 - player_id : id del jugador.
         """
         try:
-            deck_size = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).count()
+            deck_size = self.db.query(ShapeCards).filter(
+                ShapeCards.player_owner == player_id).count()
             return deck_size
         except NoResultFound:
-            raise NoResultFound(f"Player with id {player_id} has not shape cards")
-    
-    def get_blocked_cards(self, player_id: int) -> ShapeCards:
+            raise NoResultFound(
+                f"Player with id {player_id} has not shape cards")
+
+    def get_blocked_cards(self, match_id: int) -> List[int]:
         """
-            Devuelve las cartas de figura de un jugador que estan bloqueadas.
+            Devuelve el id de todas las cartass bloqueadas del match
             Args:
-                - player_id : id del jugador.
+                - match_id : id del match
         """
         try:
-            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(ShapeCards.is_blocked == IsBlocked.BLOCKED.name).one()
-            return cards
+            cards = self.db.query(ShapeCards).filter(ShapeCards.match_id == match_id).filter(
+                ShapeCards.is_blocked == IsBlocked.BLOCKED.name).all()
+            id_cards= []
+            # Solo necesitamos los ids
+            for card in cards:
+                id_cards.append(card.id)
+            return id_cards
         except NoResultFound:
-            return None
+            return []
