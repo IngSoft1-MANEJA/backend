@@ -23,11 +23,10 @@ from app.database import Base, get_db
 from app.models.models import *
 from app.routers import matches, players
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-
 
 @pytest.fixture
 def db_session():
+    basedir = os.path.abspath(os.path.dirname(__file__))
     SQLALCHEMY_DATABASE_URL = "sqlite:///tests/test_db.sqlite"
     engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
     Base.metadata.create_all(bind=engine, checkfirst=True)
@@ -43,13 +42,14 @@ def db_session():
 
 @pytest.fixture
 def app(db_session):
+    os.environ["TURN_TIMER"] = "1"
 
     def override_get_db():
         try:
             yield db_session
         finally:
             db_session.close()
-
+    
     app = FastAPI()
 
     origins = ["*"]

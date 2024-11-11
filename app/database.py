@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -10,15 +12,16 @@ engine = create_engine(f'sqlite:///{DATABASE_FILENAME}')
 # Crea una sesión
 Init_Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+logger = logging.getLogger(__name__)
 
 def init_db():
     Base.metadata.create_all(bind=engine, checkfirst=True)
-    print("Database initialized")
+    logger.info("Database initialized")
 
 
 def delete_db():
     Base.metadata.drop_all(bind=engine)
-    print("Database deleted")
+    logger.info("Database deleted")
 
 
 def get_db():
