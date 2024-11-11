@@ -156,9 +156,11 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             shapes += [(shape.value, False) for shape in EasyShapes] * 2
             shuffle(shapes)
 
+            players_in_match = player_service.get_players_by_match(match_id)
             # Crea el mazo de figuras para cada jugador
-            for player in match.players:
-                for _ in range(4):
+            for player in players_in_match:
+                print(player.id)
+                for _ in range(int(MAX_SHAPE_CARDS / match.max_players)):
                     shape = shapes.pop()
                     shape_service.create_shape_card(
                         shape[0], shape[1], False, player.id)
@@ -169,7 +171,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             board_service.init_board(board.id)
             _ = match_service.set_players_order(match)
 
-            for player_i in match.players:
+            for player_i in players_in_match:
                 msg = {"key": "START_MATCH",
                        "payload": {}}
                 await manager.send_to_player(match_id, player_i.id, msg)
