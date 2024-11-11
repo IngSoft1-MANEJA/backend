@@ -167,14 +167,14 @@ def test_add_anonymous_connection_remove_anonymous_connection(app):
     client = TestClient(app)
     with client.websocket_connect("/wsTestRoute") as websocket:
         manager2.add_anonymous_connection(websocket)
-        assert manager2._connections.count(websocket)
+        assert len(manager2._connections)
 
         manager2.remove_anonymous_connection(websocket)
-        assert not manager2._connections.count(websocket)
+        assert not len(manager2._connections)
         
         # Raises ValueError but is handled
         manager2.remove_anonymous_connection(websocket)
-        assert not manager2._connections.count(websocket)
+        assert not len(manager2._connections)
 
 def test_create_connection(client):
     with client.websocket_connect("/matches/ws") as websocket:
