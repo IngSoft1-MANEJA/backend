@@ -477,7 +477,7 @@ async def get_match_info_to_player(match_id: int, player_id: int,
     player_service = PlayerService(db)
     try:
         player = player_service.get_player_by_id(player_id)
-        if player.token != token:
+        if player.session_token != token:
             raise HTTPException(status_code=403, detail="Token inválido")
         
         match = MatchService(db).get_match_by_id(match_id)
