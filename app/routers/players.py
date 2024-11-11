@@ -489,7 +489,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
         board = board_service.get_board_by_match_id(match_id)
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Board not found")
-
+    logger.info(match.current_player_turn)
     movements = []
     tiles = []
     for _ in range(len(board.temporary_movements)):
@@ -548,7 +548,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
                                 "shape_cards": []}]}
         await manager.broadcast_to_game(player.match_id, msg_all)
 
-    db.refresh(match)
+    #db.refresh(match)
     msg = {
         "key": "END_PLAYER_TURN",
         "payload": {
@@ -560,7 +560,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
         }
     }
     await manager.broadcast_to_game(match.id, msg)
-
+    logger.info(match.current_player_turn)
     background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
     return JSONResponse(None, background=background_tasks)
 

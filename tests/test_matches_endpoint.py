@@ -147,22 +147,24 @@ async def test_notify_all_players_movements_received():
         mock_send_to_player.assert_any_call(match.id, player_4.id, msg_all)
 
 @pytest.mark.asyncio
-@patch("app.routers.players.ShapeCardService")
-async def test_give_shape_card_to_player_initial(mock_shape_card_service):
+async def test_give_shape_card_to_player_initial():
     db_session = MagicMock(spec=Session)
     player_id = 1
     is_init = True
 
     player = MagicMock(id=player_id, player_name="Player1", turn_order=1, match_id=1)
+    shape_card_service = MagicMock()
+    shape_card_service.get_visible_cards.return_value = []
+    shape_card_service.get_visible_cards.return_value = [MagicMock(id=1, shape_type="circle")]
 
-    mock_shape_card_service.get_visible_cards.return_value = [
-        MagicMock(id=1, shape_type="circle", is_visible=False),
-        MagicMock(id=1, shape_type="circle", is_visible=False)]
-
-    with patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
-         patch('app.routers.matches.manager.broadcast_to_game', new_callable=AsyncMock) as mock_broadcast_to_game:
+    with patch('app.routers.players.PlayerService.get_player_by_id', return_value=player), \
+         patch('app.routers.players.ShapeCardService', return_value=shape_card_service), \
+         patch('app.routers.players.manager.broadcast_to_game', new_callable=AsyncMock) as mock_broadcast_to_game:
         
         await give_shape_card_to_player(player_id, db_session, is_init)
+        
+        shape_card_service.update_shape_card.assert_called_once()
+        mock_broadcast_to_game.assert_not_called()
 
 @pytest.mark.asyncio
 async def test_give_shape_card_to_player_non_initial():
@@ -175,9 +177,9 @@ async def test_give_shape_card_to_player_non_initial():
     shape_card_service.get_visible_cards.return_value = []
     shape_card_service.get_visible_cards.return_value = [MagicMock(id=1, shape_type="circle")]
 
-    with patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
-         patch('app.routers.matches.ShapeCardService', return_value=shape_card_service), \
-         patch('app.routers.matches.manager.broadcast_to_game', new_callable=AsyncMock) as mock_broadcast_to_game:
+    with patch('app.routers.players.PlayerService.get_player_by_id', return_value=player), \
+         patch('app.routers.players.ShapeCardService', return_value=shape_card_service), \
+         patch('app.routers.players.manager.broadcast_to_game', new_callable=AsyncMock) as mock_broadcast_to_game:
         
         await give_shape_card_to_player(player_id, db_session, is_init)
         
