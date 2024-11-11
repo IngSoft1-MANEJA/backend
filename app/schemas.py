@@ -1,4 +1,4 @@
-from typing import List, Self
+from typing import List
 import logging
 from pydantic import BaseModel, field_validator, model_validator
 
@@ -53,7 +53,7 @@ class MatchCreateIn(BaseModel):
     
 
     @model_validator(mode="after")
-    def set_is_public(self) -> Self:
+    def set_is_public(self):
         if self.password.strip() != "":
             self.is_public = False
         return self
