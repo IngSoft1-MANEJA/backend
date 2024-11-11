@@ -427,6 +427,7 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
         players_in_match = p_service.get_players_by_match(match_id)
         deck_size = ShapeCardService(db).get_deck_size(player_id)
         current_player = p_service.get_player_by_turn(match.current_player_turn, match_id)
+        blocked_figure = ShapeCardService(db).get_blocked_cards(player_id)
     except Exception as e:
         print(f"Error al obtener informacion de la partida: {e}")
         raise HTTPException(
@@ -440,12 +441,15 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
             "is_owner": player.is_owner,
             "board": board_table,
             "current_turn_player": current_player.player_name,
+            "current_turn_order": current_player.turn_order,
             "deck_size": deck_size,
             "ban_color": match.board.ban_color,
+            "block_figures": blocked_figure, #Figura bloqueada
             "opponents": [
                 {
                     "player_name": opponent.player_name,
-                    "turn_order": opponent.turn_order
+                    "turn_order": opponent.turn_order,
+                    "blocked_figures": ShapeCardService(db).get_blocked_cards(opponent.id),
                 }
                 for opponent in players_in_match
                 if opponent.id != player_id
