@@ -1,10 +1,9 @@
 from typing import List
-from pytest import Session
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates, DeclarativeBase
-from sqlalchemy import String, Integer, Boolean, ForeignKey
+from sqlalchemy import DateTime, String, Integer, Boolean, ForeignKey
 
 from app.utils.utils import VALID_SHAPES
-from app.models.enums import Colors, HardShapes, EasyShapes, Movements, MatchState, IsBlocked
+from app.models.enums import Colors, Movements, MatchState, IsBlocked
 
 
 class Base(DeclarativeBase):
@@ -23,6 +22,7 @@ class Matches(Base):
     current_players: Mapped[int] = mapped_column(Integer)
     max_players: Mapped[int] = mapped_column(Integer)
     current_player_turn: Mapped[int] = mapped_column(Integer, default=0)
+    started_turn_time: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
 
     # --------------------------------- RELATIONSHIPS -----------------------#
     players: Mapped[List["Players"]] = relationship("Players", back_populates="match",

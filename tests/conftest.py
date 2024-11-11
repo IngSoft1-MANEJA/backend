@@ -23,11 +23,10 @@ from app.database import Base, get_db
 from app.models.models import *
 from app.routers import matches, players
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-
 
 @pytest.fixture
 def db_session():
+    basedir = os.path.abspath(os.path.dirname(__file__))
     SQLALCHEMY_DATABASE_URL = "sqlite:///tests/test_db.sqlite"
     engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
     Base.metadata.create_all(bind=engine, checkfirst=True)
@@ -43,13 +42,14 @@ def db_session():
 
 @pytest.fixture
 def app(db_session):
+    os.environ["TURN_TIMER"] = "1"
 
     def override_get_db():
         try:
             yield db_session
         finally:
             db_session.close()
-
+    
     app = FastAPI()
 
     origins = ["*"]
@@ -69,6 +69,27 @@ def app(db_session):
 
     app.dependency_overrides.clear()
 
+
+@pytest.fixture
+@patch.object(MatchService, "get_match_by_id")
+@patch.object(MatchService, "get_all_matches")
+@patch.object(MatchService, "create_match")
+@patch.object(MatchService, "delete_match")
+@patch.object(MatchService, "get_match_id")
+@patch.object(MatchService, "set_players_order")
+@patch.object(MatchService, "update_match")
+@patch.object(MatchService, "update_turn")
+def match_mocks(mock1, mock2, mock3, mock4, mock5, mock6, mock7, mock8):
+    return {
+    "get_match_by_id": mock1,
+    "get_all_matches": mock2,
+    "create_match": mock3,
+    "delete_match": mock4,
+    "get_match_id": mock5,
+    "set_players_order": mock6,
+    "update_match": mock7,
+    "update_turn": mock8
+}
 
 @pytest.fixture
 def manager():
