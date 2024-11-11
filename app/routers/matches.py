@@ -436,6 +436,8 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
         "key": "GET_PLAYER_MATCH_INFO",
         "payload": {
             "turn_order": player.turn_order,
+            "player_name": player.player_name,
+            "is_owner": player.is_owner,
             "board": board_table,
             "current_turn_player": current_player.player_name,
             "deck_size": deck_size,
