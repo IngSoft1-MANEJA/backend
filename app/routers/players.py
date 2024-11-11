@@ -22,6 +22,7 @@ from app.logger import logging
 from app.models import enums
 from app.models.enums import EasyShapes, HardShapes, ReasonWinning
 from app.models.models import Matches, Players, ShapeCards
+from app.routers.matches import give_movement_card_to_player, give_shape_card_to_player, notify_all_players_movements_received, notify_matches_list, notify_movement_card_to_player
 from app.schemas import MatchOut, PartialMove, UseFigure
 from app.utils.board_shapes_algorithm import (Coordinate, Figure,
                                               rotate_90_degrees,
