@@ -89,7 +89,6 @@ class ConnectionManager:
         """
         while True:
             try:
-                self._connections.pop()
                 response = await self._connections[index]["websocket"].receive_json()
             except IndexError:
                 # La conexión ya no existe, salir del bucle
