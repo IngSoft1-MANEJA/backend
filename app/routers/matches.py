@@ -171,6 +171,8 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
     if match.current_players >= match.max_players:
         raise HTTPException(status_code=409, detail="Match is full")
 
+    if match.password != playerJoinIn.password:
+        raise HTTPException(status_code=401, detail="password is incorrect")
 
     player = player_service.create_player(
         playerJoinIn.player_name, match_id, False, "123")

@@ -76,7 +76,7 @@ class MatchCreateOut(MatchOut):
 
 class PlayerJoinIn(BaseModel):
     player_name: str
-    
+    password: str = ""
 
     @field_validator("player_name")
     @classmethod
@@ -88,6 +88,19 @@ class PlayerJoinIn(BaseModel):
         if not value.replace(" ", "").isalnum():
             raise ValueError("Input must contain alphanumeric words")
         
+        return value.strip()
+    
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str):
+        if value.strip() is "":
+            return value.strip()
+        if any(char in INVALID_CHARACTERS for char in value):
+            raise ValueError("Input can't contain special characters")
+        if len(value.strip()) < 3 or len(value.strip()) > 50:
+            raise ValueError("Input length must be great than 3 and less than 50")
+        if not value.replace(" ", "").isalnum():
+            raise ValueError("Input must contain alphanumeric words")
         return value.strip()
 
 
