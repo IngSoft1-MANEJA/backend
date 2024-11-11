@@ -175,3 +175,15 @@ class ShapeCardService():
             return deck_size
         except NoResultFound:
             raise NoResultFound(f"Player with id {player_id} has not shape cards")
+    
+    def get_blocked_cards(self, player_id: int) -> ShapeCards:
+        """
+            Devuelve las cartas de figura de un jugador que estan bloqueadas.
+            Args:
+                - player_id : id del jugador.
+        """
+        try:
+            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(ShapeCards.is_blocked == IsBlocked.BLOCKED.name).one()
+            return cards
+        except NoResultFound:
+            return None
