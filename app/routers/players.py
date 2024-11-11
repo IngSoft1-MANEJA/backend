@@ -638,7 +638,7 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
         except NoResultFound:
             raise HTTPException(status_code=404, detail="Tile not found")
 
-        aux_tile = copy(tile1)
+        aux_tile = copy.copy(tile1)
         tile_service.update_tile_position(
             tile1.id, tile2.position_x, tile2.position_y)
         tile_service.update_tile_position(
@@ -670,19 +670,13 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
         msg = {"key": "PLAYER_RECEIVE_NEW_BOARD",
                "payload": {"swapped_tiles": tiles}}
         await manager.broadcast_to_game(match_id, msg)
+        
+        formed_figures = board_service.get_formed_figures(match.board.id)
 
-        # Send Info about figures coordinates
-        board_figures = None
-        try:
-            match = MatchService(db).get_match_by_id(match_id)
-            board_figures = BoardService(db).get_formed_figures(match.board.id)
-        except Exception:
-            raise HTTPException(
-                status_code=500, detail="Error with formed figures")
-
-        board_figures = board_service.get_formed_figures(match_id)
+        logger.info("nuevas figuras formadas %s", formed_figures)
+        
         allow_figures_event = filter_allowed_figures(
-            match_id, board_service, board_figures, tile_service)
+            match_id, board_service, formed_figures, tile_service)
         await manager.broadcast_to_game(match_id, allow_figures_event)
 
     else:
