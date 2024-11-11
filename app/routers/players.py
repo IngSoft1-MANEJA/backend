@@ -313,6 +313,7 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
         tile_service = TileService(db)
         board_service = BoardService(db)
         player_service = PlayerService(db)
+        shape_card_service = ShapeCardService(db)
 
         try:
             player = player_service.get_player_by_turn(turn_order, match_id)
@@ -368,8 +369,22 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
 
         await notify_movement_card_to_player(player.id, match_id, movements)
         await notify_all_players_movements_received(player, match)
-        await give_shape_card_to_player(player.id, db, is_init=False)
-        db.refresh(match)
+        
+        cant_draw = False
+        cards = shape_card_service.get_shape_card_by_player(player.id)
+        for card in cards:
+            if card.is_blocked != "NOT_BLOCKED":
+                cant_draw = True
+        
+        if not cant_draw:
+            await give_shape_card_to_player(player.id, db, is_init=False)
+        else:
+            msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
+                    "payload": [{"player": player.player_name, 
+                                    "turn_order": player.turn_order, 
+                                    "shape_cards": []}]}
+            await manager.broadcast_to_game(player.match_id, msg_all)
+        
         msg = {
             "key": "END_PLAYER_TURN",
             "payload": {
@@ -383,8 +398,6 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
         await manager.broadcast_to_game(match.id, msg)
 
         background_tasks.add_task(turn_timeout, match_id, db, next_player.turn_order, background_tasks)
-        logger.info("Getting out IF")
-    logger.info("End function")
 
 
 @router.delete("/{match_id}/left/{player_id}")
@@ -548,7 +561,6 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
                                 "shape_cards": []}]}
         await manager.broadcast_to_game(player.match_id, msg_all)
 
-    #db.refresh(match)
     msg = {
         "key": "END_PLAYER_TURN",
         "payload": {
@@ -560,7 +572,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
         }
     }
     await manager.broadcast_to_game(match.id, msg)
-    logger.info(match.current_player_turn)
+
     background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
     return JSONResponse(None, background=background_tasks)
 
