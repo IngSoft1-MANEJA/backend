@@ -16,7 +16,7 @@ from app.cruds.shape_card import ShapeCardService
 from app.cruds.tile import TileService
 from app.exceptions import GameConnectionDoesNotExist, PlayerAlreadyConnected, PlayerNotConnected
 from app.models.enums import *
-from app.models.models import Matches, Players
+from app.models.models import Matches, Players, TileMovement
 from app.schemas import *
 from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS
@@ -359,10 +359,43 @@ async def send_shape_cards_info(match_id: int, player_id: int,
     await manager.send_to_player(match_id, player_id, msg_shapes)
 
 
+def get_last_movs_by_player(board_id: int, player_id: int, 
+                            b_service: BoardService, 
+                            mc_service: MovementCardService) -> List[TileMovement]:
+    """
+    Obtiene los ultimos movimientos de un jugador en un tablero.
+    Args:
+        board_id: Id del tablero.
+        player_id: Id del jugador.
+        b_service: Servicio de tablero.
+        m_service: Servicio de cartas de movimiento.
+    Returns:
+        movements: Lista de ultimos movimientos.
+    """
+    board = b_service.get_board_by_id(board_id)
+    movements = board.temporary_movements
+    logger.info(f"Last movements: {movements}")
+    movs_filtered = []
+    for mov in movements:
+        logger.info(f"Movement: {mov.id_mov}")
+        mov_figure = mc_service.get_movement_card_by_id(mov.id_mov)
+        logger.info(f"Movement figure: {mov_figure.mov_type}")
+        if mov_figure.player_owner == None:
+            movs_filtered.append((mov_figure.id, mov_figure.mov_type))
+    logger.info(f"Last movements by player {player_id}: {movs_filtered}")
+    return movs_filtered
+
+
 async def send_movement_cards_info(player_id: int, match_id: int, 
-                                   m_service: MovementCardService):
-    movements = m_service.get_movement_card_by_user(player_id)
+                                   mc_service: MovementCardService,
+                                   b_service: BoardService):
+    
+    board = b_service.get_board_by_match_id(match_id)
+    movements = mc_service.get_movement_card_by_user(player_id)
     all_movements = [(mov.id, mov.mov_type) for mov in movements]
+    
+    last_movs_player = get_last_movs_by_player(board.id, player_id, b_service, mc_service)
+    all_movements += last_movs_player
     await notify_movement_card_to_player(player_id, match_id, all_movements)
 
 
@@ -469,7 +502,7 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
     await manager.send_to_player(match_id, player_id, msg_info)
     
     await send_shape_cards_info(match_id, player_id, players_in_match, s_service)
-    await send_movement_cards_info(player_id, match_id, movement_service)
+    await send_movement_cards_info(player_id, match_id, movement_service, board_service)
     await send_figures_info(match_id, player_id, db)
 
 # =============================================================================
