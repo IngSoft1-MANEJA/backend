@@ -441,7 +441,7 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
     movs = []
     for last_movement in board.get_movs():
         mov_type = movement_service.get_movement_card_by_id(last_movement.id_mov).mov_type
-        movs += [last_movement.id_mov, mov_type]
+        movs.append([last_movement.id_mov, mov_type])
         
     msg_info = {
         "key": "GET_PLAYER_MATCH_INFO",
