@@ -476,15 +476,13 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
     board_service = BoardService(db)
     tile_service = TileService(db)
     shape_card_service = ShapeCardService(db)
-    player_service = PlayerService(db)
-    match_service = MatchService(db)
     
     try:
-        player = player_service.get_player_by_id(player_id)
+        player = PlayerService(db).get_player_by_id(player_id)
     except:
         raise HTTPException(status_code=404, detail=f"Player not found")
     try:
-        match = match_service.get_match_by_id(match_id)
+        match = MatchService(db).get_match_by_id(match_id)
     except:
         raise HTTPException(status_code=404, detail=f"Match not found")
     try:
@@ -492,7 +490,42 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Board not found")
     
-    movements = await undo_partials_movements(board, player_id, match_id, db)
+    movements = []
+    tiles = []
+    for _ in range(len(board.temporary_movements)):
+        try:
+            last_movement = board_service.get_last_temporary_movements(
+                board.id)
+        except NoResultFound as e:
+            raise HTTPException(status_code=404, detail=e)
+
+        tile1 = last_movement.tile1
+        tile2 = last_movement.tile2
+
+        try:
+            movement = movement_card_service.get_movement_card_by_id(
+                last_movement.id_mov)
+            movement_card_service.add_movement_card_to_player(
+                player_id, movement.id)
+        except NoResultFound as e:
+            raise HTTPException(status_code=404, detail=e)
+
+        movements.append((movement.id, movement.mov_type))
+        tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, 
+                 {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+        aux_tile = copy(tile1)
+
+        try:
+            tile_service.update_tile_position(
+                tile1.id, tile2.position_x, tile2.position_y)
+            tile_service.update_tile_position(
+                tile2.id, aux_tile.position_x, aux_tile.position_y)
+        except NoResultFound as e:
+            raise HTTPException(status_code=404, detail=e)
+
+        await sleep(1)
+        msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
+        await manager.broadcast_to_game(match_id, msg)
 
     next_player = end_turn_logic(player, match, db)
     movements += give_movement_card_to_player(player_id, db)
@@ -515,7 +548,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
                                 "shape_cards": []}]}
         await manager.broadcast_to_game(player.match_id, msg_all)
 
-    db.refresh(match)
+    #db.refresh(match)
     msg = {
         "key": "END_PLAYER_TURN",
         "payload": {
