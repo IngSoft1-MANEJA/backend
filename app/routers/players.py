@@ -20,12 +20,8 @@ from app.database import get_db
 from app.exceptions import *
 from app.logger import logging
 from app.models import enums
-from app.models.enums import EasyShapes, HardShapes, ReasonWinning, Colors
+from app.models.enums import EasyShapes, HardShapes, ReasonWinning
 from app.models.models import Matches, Players, ShapeCards
-from app.routers.matches import (give_movement_card_to_player,
-                                 give_shape_card_to_player,
-                                 notify_all_players_movements_received, notify_matches_list,
-                                 notify_movement_card_to_player)
 from app.schemas import MatchOut, PartialMove, UseFigure
 from app.utils.board_shapes_algorithm import (Coordinate, Figure,
                                               rotate_90_degrees,
@@ -631,6 +627,21 @@ async def undo_partials_movements(board, player_id, match_id, db: Session = Depe
 
     return movements
 
+
+async def unlock_figures(shape_card: ShapeCards, player_id, match_id, db):
+    shape_card_service = ShapeCardService(db)
+    visible_cards = shape_card_service.get_visible_cards(player_id, True)
+    print("antes del if, carta", shape_card.id, shape_card.shape_type)
+    if shape_card.is_blocked == "NOT_BLOCKED":
+        for card in visible_cards:
+            print("carta iterando", card.id, card.shape_type, card.is_blocked)
+            if card.is_visible == True and card.is_blocked == "BLOCKED" and len(visible_cards) == 2:
+                print("carta dentro del if", card.id, card.shape_type, card.is_blocked)
+                shape_card_service.update_shape_card(card.id, True, "UNLOCKED")
+                msg = {"key": "UNLOCK_FIGURE", "payload": { "figure_id": card.id }}
+                await manager.broadcast_to_game(match_id, msg)
+
+
 @router.post("/{match_id}/player/{player_id}/use-figure", status_code=200)
 async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Session = Depends(get_db)):
     match_service = MatchService(db)
@@ -692,6 +703,7 @@ async def use_figure(match_id: int, player_id: int, request: UseFigure, db: Sess
         new_ban_color = check_ban_color(board.id, tile_service, request, board.ban_color)
         figure_name = shape_card_service.get_shape_card_by_id(request.figure_id).shape_type
         movements = await undo_partials_movements(board, player_id, match_id, db)
+        await unlock_figures(shape_card, player_id, match_id, db)
         shape_card_service.delete_shape_card(request.figure_id)
 
     except NoResultFound:

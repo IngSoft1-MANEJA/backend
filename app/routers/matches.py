@@ -308,7 +308,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
             # Crea el mazo de figuras para cada jugador
             for player in match.players:
-                for _ in range(int(MAX_SHAPE_CARDS / match.max_players)):
+                for _ in range(4):
                     shape = shapes.pop()
                     shape_service.create_shape_card(
                         shape[0], shape[1], False, player.id)
