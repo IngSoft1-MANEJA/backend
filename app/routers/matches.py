@@ -22,7 +22,6 @@ from app.database import get_db
 from app.utils.utils import MAX_SHAPE_CARDS
 from app.logger import logging
 from app.cruds.tile import TileService
-from app.cruds.board import BoardService
 
 logger = logging.getLogger(__name__)
 
@@ -421,18 +420,28 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
         m_service = MatchService(db)
         movement_service = MovementCardService(db)
         s_service = ShapeCardService(db)
+        board_service = BoardService(db)
+        
         match = m_service.get_match_by_id(match_id)
         player = p_service.get_player_by_id(player_id)
+        
         board_table = BoardService(db).get_board_table(match.board.id)
+        board = board_service.get_board_by_id(match.board.id)
+        
         players_in_match = p_service.get_players_by_match(match_id)
         deck_size = ShapeCardService(db).get_deck_size(player_id)
         current_player = p_service.get_player_by_turn(match.current_player_turn, match_id)
         blocked_figures = ShapeCardService(db).get_blocked_cards(match_id)
+        
     except Exception as e:
         print(f"Error al obtener informacion de la partida: {e}")
         raise HTTPException(
             status_code=404, detail="Error al obtener informacion de la partida")
-
+        
+    movs = []
+    for last_movement in board.get_movs():
+        movs += [last_movement.id_mov]
+        
     msg_info = {
         "key": "GET_PLAYER_MATCH_INFO",
         "payload": {
@@ -445,6 +454,7 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
             "deck_size": deck_size,
             "ban_color": match.board.ban_color,
             "block_figures": blocked_figures,
+            "last_movements": movs,
             "opponents": [
                 {
                     "player_name": opponent.player_name,
