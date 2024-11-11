@@ -74,7 +74,7 @@ def test_update_player(player_service: PlayerService):
 
 def test_delete_player(player_service: PlayerService, db_session):
     match = MatchService(db_session)
-    match.create_match('Test-Match-Delete', 3, True)
+    match.create_match('Test-Match-Delete', 3, True, password="")
     player = player_service.create_player(
         'Test-Player-Delete', 1, True, 'tokenidelete1')
     number_players = db_session.query(Players).count()
@@ -85,7 +85,7 @@ def test_delete_player(player_service: PlayerService, db_session):
 
 def test_get_players_by_match(player_service: PlayerService, match_service: MatchService, db_session):
     # Crear un match y jugadores
-    match = match_service.create_match('Test-Match', 3, True)
+    match = match_service.create_match('Test-Match', 3, True, password="")
     players = player_service.get_players_by_match(match.id)
     print("1", players)
     player1 = player_service.create_player('Player1', match.id, False, 'token')
@@ -101,7 +101,7 @@ def test_get_players_by_match(player_service: PlayerService, match_service: Matc
 
 def test_get_players_by_match_no_players(player_service: PlayerService, match_service: MatchService, db_session):
     # Crear un match sin jugadores
-    match = match_service.create_match('Test-Match-No-Players', 3, True)
+    match = match_service.create_match('Test-Match-No-Players', 3, True, password="")
     
     # Obtener la lista de jugadores por match_id
     players1 = player_service.get_players_by_match(match.id)
@@ -111,7 +111,7 @@ def test_get_players_by_match_no_players(player_service: PlayerService, match_se
 
 def test_update_turn_success(db_session, match_service: MatchService):
     # Crear un match para la prueba
-    match_service.create_match('test_match', 4, True)
+    match_service.create_match('test_match', 4, True, password="")
     match = db_session.query(Matches).filter(Matches.match_name == 'test_match').one()
     
     # Actualizar el turno del match

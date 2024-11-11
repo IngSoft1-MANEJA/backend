@@ -145,7 +145,7 @@ def load_matches(db_session):
                 Players(player_name="Player 1", is_owner=True, match_id=1, session_token=""), Players(player_name="Player 2", is_owner=False, match_id=1, session_token="")
             ]),
         Matches(match_name="Match 2", max_players=2, is_public=True, state="STARTED", current_players=2),
-        Matches(match_name="Match 3", max_players=4, is_public=True, state="WAITING", current_players=1, players=[
+        Matches(match_name="Match 3", max_players=4, is_public=False, password="AAA", state="WAITING", current_players=1, players=[
                 Players(player_name="Player 3", is_owner=True, match_id=3, session_token="")
             ])
     ]

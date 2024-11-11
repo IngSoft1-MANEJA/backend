@@ -28,7 +28,7 @@ def test_create_match(client, db_session):
             "token": "testtoken"
         }
     )
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.json()
     assert "player_id" in data
     assert "match_id" in data
@@ -69,7 +69,7 @@ def test_join_match_success(client, load_matches, db_session):
     manager.create_game_connection(3)
     match = db_session.query(Matches).filter(Matches.id == 3).first()
     current_players = match.current_players
-    response = client.post("/matches/3", json={"player_name": "Player 4"})
+    response = client.post("/matches/3", json={"player_name": "Player 4", "password":"AAA"})
     assert response.status_code == status.HTTP_200_OK
     match = db_session.query(Matches).filter(Matches.id == 3).first()
     assert match.current_players == current_players + 1
