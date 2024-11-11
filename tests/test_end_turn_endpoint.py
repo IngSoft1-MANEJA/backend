@@ -20,7 +20,6 @@ def setup_mocks():
          patch("app.routers.players.give_movement_card_to_player") as mock_give_movement_card_to_player, \
          patch("app.routers.players.notify_movement_card_to_player", new_callable=AsyncMock) as mock_notify_movement_card_to_player, \
          patch("app.routers.players.give_shape_card_to_player", new_callable=AsyncMock) as mock_give_shape_card_to_player, \
-         patch("app.routers.players.notify_all_players_movements_received", new_callable=AsyncMock) as mock_notify_all_players_movements_received, \
          patch("app.connection_manager.ConnectionManager.send_to_player", new_callable=AsyncMock) as mock_send_to_player:
         
         yield {
@@ -33,7 +32,6 @@ def setup_mocks():
             "mock_give_movement_card_to_player": mock_give_movement_card_to_player,
             "mock_notify_movement_card_to_player": mock_notify_movement_card_to_player,
             "mock_give_shape_card_to_player": mock_give_shape_card_to_player,
-            "mock_notify_all_players_movements_received": mock_notify_all_players_movements_received,
             "mock_send_to_player": mock_send_to_player,
             "mock_get_board_by_match_id": mock_get_board_by_match_id
         }

@@ -15,7 +15,6 @@ from app.connection_manager import manager
 from app.models.models import Boards, Tiles
 from app.routers.players import (give_movement_card_to_player, 
                                  notify_movement_card_to_player, 
-                                 notify_all_players_movements_received, 
                                  give_shape_card_to_player)
 
 def test_create_match(client, db_session):
@@ -125,26 +124,6 @@ async def test_notify_movement_card_to_player():
     with patch('app.routers.matches.manager.send_to_player', new_callable=AsyncMock) as mock_send_to_player:
         await notify_movement_card_to_player(player_id, match_id, buff_movement)
         mock_send_to_player.assert_called_once_with(match_id, player_id, msg_user)
-
-@pytest.mark.asyncio
-async def test_notify_all_players_movements_received():
-    player = MagicMock(id=1, player_name="Player1")
-    player_2 = MagicMock(id=2, player_name="Player2")
-    player_3 = MagicMock(id=3, player_name="Player3")
-    player_4 = MagicMock(id=4, player_name="Player4")
-    match = MagicMock(id=1, players=[player, player_2, player_3, player_4])
-
-    msg_all = {
-        "key": "PLAYER_RECEIVE_MOVEMENT_CARD",
-        "payload": {"player": player.player_name}
-    }
-
-    with patch('app.routers.matches.manager.send_to_player', new_callable=AsyncMock) as mock_send_to_player:
-        await notify_all_players_movements_received(player, match)
-        assert mock_send_to_player.call_count == 3
-        mock_send_to_player.assert_any_call(match.id, player_2.id, msg_all)
-        mock_send_to_player.assert_any_call(match.id, player_3.id, msg_all)
-        mock_send_to_player.assert_any_call(match.id, player_4.id, msg_all)
 
 @pytest.mark.asyncio
 async def test_give_shape_card_to_player_initial():

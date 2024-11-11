@@ -132,22 +132,6 @@ async def notify_movement_card_to_player(player_id: int, match_id: int, buff_mov
     await manager.send_to_player(match_id, player_id, msg_user)
 
 
-async def notify_all_players_movements_received(player: Players, match: Matches):
-    """
-        Notifica a los demás jugadores que un jugador recibió una carta de movimiento.
-        Args:
-            - player : jugador que recibió la carta.
-            - match : partida en la que se encuentra.
-        Returns:
-            None, se comunica mediante websockets.
-    """
-    for player_i in match.players:
-        if player_i.id != player.id:
-            msg_all = {"key": "PLAYER_RECEIVE_MOVEMENT_CARD",
-                       "payload": {"player": player.player_name}}
-            await manager.send_to_player(match.id, player_i.id, msg_all)
-
-
 async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
     """
         Da hasta 3 cartas de figuras al jugador.
@@ -322,7 +306,6 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
         except Exception as e:
             logger.error(e)
             return None
-        logger.info("Current Player turn: %s, %s", player.turn_order, player.player_name)
         movements = []
         tiles = []
         for _ in range(len(board.temporary_movements)):
@@ -368,7 +351,6 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
         movements += give_movement_card_to_player(player.id, db)
 
         await notify_movement_card_to_player(player.id, match_id, movements)
-        await notify_all_players_movements_received(player, match)
         
         cant_draw = False
         cards = shape_card_service.get_shape_card_by_player(player.id)
@@ -544,7 +526,6 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
     movements += give_movement_card_to_player(player_id, db)
 
     await notify_movement_card_to_player(player_id, match_id, movements)
-    await notify_all_players_movements_received(player, match)
 
     cant_draw = False
     cards = shape_card_service.get_shape_card_by_player(player_id)
