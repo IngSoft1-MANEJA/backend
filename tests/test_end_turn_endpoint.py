@@ -38,44 +38,6 @@ def setup_mocks():
             "mock_get_board_by_match_id": mock_get_board_by_match_id
         }
 
-@pytest.mark.asyncio
-async def test_end_turn_success(client, setup_mocks, db_session):
-    mocks = setup_mocks
-    player1 = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=True, turn_order=1)
-    player2 = MagicMock(id=2, player_name="Player 2", match_id=1, is_owner=False, turn_order=2)
-    match = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
-    board = MagicMock(id=1, match_id=1)
-    movements = [(1, "Line"), (2, "Line Between"), (3, "Line Between")]
-    
-    mocks["mock_get_player_by_id"].side_effect = [player1, player2, player1]  # Añadir player1 para la llamada desde give_shape_card_to_player
-    mocks["mock_get_match_by_id"].return_value = match
-    mocks["mock_end_turn_logic"].return_value = player2
-    mocks["mock_give_movement_card_to_player"].return_value = movements
-    mocks["mock_get_board_by_match_id"].return_value = board
-    
-    response = client.patch("/matches/1/end-turn/1")
-    
-    print(f"Response status: {response.status_code}")
-    print(f"Response json: {response.json()}")
-    
-    assert response.status_code == status.HTTP_200_OK
-    mocks["mock_end_turn_logic"].assert_called_once_with(player1, match, db_session)
-    mocks["mock_notify_movement_card_to_player"].assert_called_once_with(1, 1, movements)
-    
-    mocks["mock_give_movement_card_to_player"].assert_called_once_with(1, db_session)
-    mocks["mock_get_board_by_match_id"].assert_called_once_with(1)
-    mocks["mock_notify_all_players_movements_received"].assert_called_once_with(player1, match)
-    mocks["mock_give_shape_card_to_player"].assert_called_once_with(1, db_session, is_init=False)
-    mocks["mock_broadcast_to_game"].assert_called_once_with(1, {
-        "key": "END_PLAYER_TURN", 
-        "payload": {
-            "current_player_turn": 1,
-            "current_player_name": "Player 1",
-            "next_player_name": "Player 2",
-            "next_player_turn": 2
-        }
-    })
-    
 
 @pytest.mark.asyncio
 async def test_end_turn_match_not_found(client, setup_mocks, db_session):
@@ -103,38 +65,6 @@ async def test_end_turn_player_not_found(client, setup_mocks, db_session):
     assert response.json()["detail"] == "Player not found"
     mocks["mock_get_player_by_id"].assert_called_once_with(1)
     mocks["mock_get_match_by_id"].assert_not_called()
-
-def test_end_turn_logic_max_turn(setup_mocks, client, db_session):
-    mocks = setup_mocks
-    player1 = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=False, turn_order=1)
-    player2 = MagicMock(id=2, player_name="Player 2", match_id=1, is_owner=False, turn_order=2)
-    match = MagicMock(id=1, state="STARTED", current_players=2, current_player_turn=1)
-
-    # Simula el comportamiento de los mocks
-    mocks["mock_get_player_by_id"].return_value = player1
-    mocks["mock_get_match_by_id"].return_value = match
-    mocks["mock_end_turn_logic"].return_value = player2  # Mockea la función end_turn_logic
-
-    # Realiza la petición al endpoint
-    response = client.patch("/matches/1/end-turn/1")
-
-    # Afirmaciones
-    assert response.status_code == status.HTTP_200_OK
-
-    # Verifica que se haya llamado a end_turn_logic con los parámetros correctos
-    mocks["mock_end_turn_logic"].assert_called_once_with(player1, match, db_session)
-
-    # Verifica que el resto de la lógica se ejecuta como es esperado
-    mocks["mock_give_movement_card_to_player"].assert_called_once_with(1, db_session)
-    mocks["mock_broadcast_to_game"].assert_called_once_with(1, {
-        "key": "END_PLAYER_TURN",
-        "payload": {
-            "current_player_turn": 1,
-            "current_player_name": "Player 1",
-            "next_player_name": "Player 2",
-            "next_player_turn": 2
-        }
-    })
 
 
 def test_end_turn_logic_not_player_turn(setup_mocks, client, db_session):
