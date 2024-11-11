@@ -19,22 +19,18 @@ class MatchCreateIn(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, value: str):
-        if value.strip() is "":
+        if value.strip() == "":
             return value.strip()
-        if any(char in INVALID_CHARACTERS for char in value):
-            raise ValueError("Input can't contain special characters")
         if len(value.strip()) < 3 or len(value.strip()) > 50:
             raise ValueError("Input length must be great than 3 and less than 50")
-        if not value.replace(" ", "").isalnum():
-            raise ValueError("Input must contain alphanumeric words")
+        if not value.strip().isalnum():
+            raise ValueError("Input must be alphanumeric")
         return value.strip()
     
 
     @field_validator("lobby_name", "player_name")
     @classmethod
     def validate_lobby_name_and_player_name(cls, value: str):
-        if any(char in INVALID_CHARACTERS for char in value):
-            raise ValueError("Input can't contain special characters")
         if len(value.strip()) < 3 or len(value.strip()) > 50:
             raise ValueError("Input length must be great than 3 and less than 50")
         if not value.replace(" ", "").isalnum():
@@ -81,8 +77,6 @@ class PlayerJoinIn(BaseModel):
     @field_validator("player_name")
     @classmethod
     def validate_player_name(cls, value: str):
-        if any(char in INVALID_CHARACTERS for char in value):
-            raise ValueError("Input can't contain special characters")
         if len(value.strip()) < 3 or len(value.strip()) > 50:
             raise ValueError("Input length must be great than 3 and less than 50")
         if not value.replace(" ", "").isalnum():
@@ -93,14 +87,12 @@ class PlayerJoinIn(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, value: str):
-        if value.strip() is "":
+        if value.strip() == "":
             return value.strip()
-        if any(char in INVALID_CHARACTERS for char in value):
-            raise ValueError("Input can't contain special characters")
         if len(value.strip()) < 3 or len(value.strip()) > 50:
             raise ValueError("Input length must be great than 3 and less than 50")
-        if not value.replace(" ", "").isalnum():
-            raise ValueError("Input must contain alphanumeric words")
+        if not value.strip().isalnum():
+            raise ValueError("Input must be alphanumeric")
         return value.strip()
 
 

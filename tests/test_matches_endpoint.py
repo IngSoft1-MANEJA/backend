@@ -84,6 +84,16 @@ def test_join_match_is_full(client):
         response = client.post("/matches/1", json={"player_name": "Player 3"})
     assert response.status_code == status.HTTP_409_CONFLICT
 
+def test_join_match_with_invalid_password(client):
+    with mock.patch("app.cruds.match.MatchService.get_match_by_id", return_value=MagicMock(current_players=2, max_players=3, is_public=False, password="AAA")):
+        response = client.post("/matches/1", json={})
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+def test_join_match_with_incorrect_password(client):
+    with mock.patch("app.cruds.match.MatchService.get_match_by_id", return_value=MagicMock(current_players=2, max_players=3, is_public=False, password="AAA")):
+        response = client.post("/matches/1", json={"player_name": "Player 3", "password": "BBB"})
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
 
 def test_start_match_success(client, load_matches):
     manager.create_game_connection(1)
