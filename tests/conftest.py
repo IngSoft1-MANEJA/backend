@@ -71,6 +71,27 @@ def app(db_session):
 
 
 @pytest.fixture
+@patch.object(MatchService, "get_match_by_id")
+@patch.object(MatchService, "get_all_matches")
+@patch.object(MatchService, "create_match")
+@patch.object(MatchService, "delete_match")
+@patch.object(MatchService, "get_match_id")
+@patch.object(MatchService, "set_players_order")
+@patch.object(MatchService, "update_match")
+@patch.object(MatchService, "update_turn")
+def match_mocks(mock1, mock2, mock3, mock4, mock5, mock6, mock7, mock8):
+    return {
+    "get_match_by_id": mock1,
+    "get_all_matches": mock2,
+    "create_match": mock3,
+    "delete_match": mock4,
+    "get_match_id": mock5,
+    "set_players_order": mock6,
+    "update_match": mock7,
+    "update_turn": mock8
+}
+
+@pytest.fixture
 def manager():
     return ConnectionManager()
 

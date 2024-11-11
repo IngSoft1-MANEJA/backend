@@ -9,12 +9,11 @@ from app.models.models import Matches, Players
 from app.routers.matches import manager
 
 @pytest.fixture(scope="function")
-
 def setup_mocks():
     with patch("app.cruds.match.MatchService.get_match_by_id") as mock_get_match_by_id, \
          patch("app.cruds.match.MatchService.update_turn") as mock_update_turn, \
          patch("app.cruds.player.PlayerService.get_player_by_id") as mock_get_player_by_id, \
-         patch("app.connection_manager.ConnectionManager.broadcast_to_game") as mock_broadcast_to_game, \
+         patch("app.routers.matches.manager.broadcast_to_game") as mock_broadcast_to_game, \
          patch("app.cruds.player.PlayerService.get_player_by_turn") as mock_get_player_by_turn, \
          patch("app.cruds.board.BoardService.get_board_by_match_id") as mock_get_board_by_match_id, \
          patch("app.routers.players.end_turn_logic") as mock_end_turn_logic, \
@@ -105,8 +104,7 @@ async def test_end_turn_player_not_found(client, setup_mocks, db_session):
     mocks["mock_get_player_by_id"].assert_called_once_with(1)
     mocks["mock_get_match_by_id"].assert_not_called()
 
-@patch("app.routers.players.turn_timeout")
-def test_end_turn_logic_max_turn(turn_timeout, setup_mocks, client, db_session):
+def test_end_turn_logic_max_turn(setup_mocks, client, db_session):
     mocks = setup_mocks
     player1 = MagicMock(id=1, player_name="Player 1", match_id=1, is_owner=False, turn_order=1)
     player2 = MagicMock(id=2, player_name="Player 2", match_id=1, is_owner=False, turn_order=2)
@@ -116,7 +114,7 @@ def test_end_turn_logic_max_turn(turn_timeout, setup_mocks, client, db_session):
     mocks["mock_get_player_by_id"].return_value = player1
     mocks["mock_get_match_by_id"].return_value = match
     mocks["mock_end_turn_logic"].return_value = player2  # Mockea la función end_turn_logic
-    turn_timeout.return_value = None
+
     # Realiza la petición al endpoint
     response = client.patch("/matches/1/end-turn/1")
 
