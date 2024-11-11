@@ -419,13 +419,14 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
     try:
         p_service = PlayerService(db)
         m_service = MatchService(db)
+        movement_service = MovementCardService(db)
         s_service = ShapeCardService(db)
         match = m_service.get_match_by_id(match_id)
         player = p_service.get_player_by_id(player_id)
         board_table = BoardService(db).get_board_table(match.board.id)
         players_in_match = p_service.get_players_by_match(match_id)
         deck_size = ShapeCardService(db).get_deck_size(player_id)
-        current_player = p_service.get_player_by_turn(match.current_player_turn)
+        current_player = p_service.get_player_by_turn(match_id, match.current_player_turn)
     except Exception as e:
         print(f"Error al obtener informacion de la partida: {e}")
         raise HTTPException(
@@ -452,7 +453,7 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
     await manager.send_to_player(match_id, player_id, msg_info)
     
     await send_shape_cards_info(match_id, player_id, players_in_match, s_service)
-    await send_movement_cards_info(player_id, match_id, m_service)
+    await send_movement_cards_info(player_id, match_id, movement_service)
     await send_figures_info(match_id, player_id, db)
 
 # =============================================================================
