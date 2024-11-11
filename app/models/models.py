@@ -162,6 +162,12 @@ class Boards(Base):
         if len(self.temporary_movements) > 0:
             last_movement = self.temporary_movements.pop()
             return last_movement
+    
+    def get_movs(self):
+        """
+            Devuelve la lista de movs sin borrarlas
+        """
+        return self.temporary_movements
 
     def print_temporary_movements(self):
         for movement in self.temporary_movements:
