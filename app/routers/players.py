@@ -312,7 +312,7 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
             return None
         movements = []
         tiles = []
-        for _ in range(len(board.temporary_movements)):
+        for _ in range(len(board.get_movs())):
             try:
                 last_movement = board_service.get_last_temporary_movements(
                     board.id)
@@ -345,10 +345,9 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
                 logger.error(e)
                 return None
 
-            await sleep(1)
             msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
             await manager.broadcast_to_game(match_id, msg)
-
+            await sleep(1)
 
         next_player = end_turn_logic(player, match, db)
         logger.info("Next Player turn: %s, %s", next_player.turn_order, next_player.player_name)
@@ -381,6 +380,7 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
                 "turn_started": match.started_turn_time.isoformat()
             }
         }
+        await sleep(1)
         await manager.broadcast_to_game(match.id, msg)
 
         background_tasks.add_task(turn_timeout, match_id, db, next_player.turn_order, background_tasks)
@@ -497,8 +497,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
         try:
             last_movement = board_service.get_last_temporary_movements(board.id)
         except NoResultFound as e:
-            raise HTTPException(status_code=404, detail=e)
-
+            raise HTTPException(status_code=404, detail=e) 
         tile1 = last_movement.tile1
         tile2 = last_movement.tile2
 
@@ -525,9 +524,9 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
         except NoResultFound as e:
             raise HTTPException(status_code=404, detail=e)
 
-        await sleep(1)
         msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
         await manager.broadcast_to_game(match_id, msg)
+        await sleep(1)
 
     next_player = end_turn_logic(player, match, db)
     movements += give_movement_card_to_player(player_id, db)
@@ -565,8 +564,8 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
             "turn_started": match.started_turn_time.isoformat()
         }
     }
+    await sleep(1)
     await manager.broadcast_to_game(match.id, msg)
-
     background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
     return JSONResponse(None, background=background_tasks)
 
