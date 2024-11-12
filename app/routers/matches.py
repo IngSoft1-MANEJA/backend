@@ -45,6 +45,7 @@ async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error("Error al enviar mensaje: %s", e)
 
+
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
@@ -178,7 +179,7 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
                 give_movement_card_to_player(player_i.id, db)
                 await give_shape_card_to_player(player_i.id, db, True)
-
+            
             background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
             return JSONResponse({"message": "Match started successfully"}, background=background_tasks)
 
