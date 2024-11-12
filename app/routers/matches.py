@@ -81,13 +81,13 @@ async def create_websocket_connection(game_id: int, player_id: int, websocket: W
             pass
 
 
-@router.post("/", status_code=200)
+@router.post("/", status_code=201)
 async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
-
+    logger.info(match)
     match1 = match_service.create_match(
-        match.lobby_name, match.max_players, match.is_public)
+        match.lobby_name, match.max_players, match.is_public, match.password)
     new_player = player_service.create_player(
         match.player_name, match1.id, True, match.token)
     manager.create_game_connection(match1.id)
@@ -99,8 +99,12 @@ async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
 
 @router.post("/{match_id}", status_code=200,
              response_model=PlayerJoinOut,
-             responses={404: {"description": "Match not found"},
-                        409: {"description": "Match is full"}})
+             responses= {
+                 401: {"description": "password is incorrect"},
+                 404: {"description": "Match not found"},
+                 409: {"description": "Match is full"}
+                 }
+            )
 async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
     """
     Create a player and add them to the match.
@@ -115,6 +119,9 @@ async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Se
 
     if match.current_players >= match.max_players:
         raise HTTPException(status_code=409, detail="Match is full")
+
+    if match.password != playerJoinIn.password:
+        raise HTTPException(status_code=401, detail="password is incorrect")
 
     player = player_service.create_player(
         playerJoinIn.player_name, match_id, False, "123")
