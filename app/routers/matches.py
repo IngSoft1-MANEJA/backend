@@ -45,6 +45,7 @@ async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error("Error al enviar mensaje: %s", e)
 
+
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(game_id: int, player_id: int, websocket: WebSocket, db: Session = Depends(get_db)):
     await websocket.accept()
@@ -163,8 +164,10 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             shapes += [(shape.value, False) for shape in EasyShapes] * 2
             shuffle(shapes)
 
+            players_in_match = player_service.get_players_by_match(match_id)
             # Crea el mazo de figuras para cada jugador
-            for player in match.players:
+            for player in players_in_match:
+                print(player.id)
                 for _ in range(int(MAX_SHAPE_CARDS / match.max_players)):
                     shape = shapes.pop()
                     shape_service.create_shape_card(
@@ -176,14 +179,14 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             board_service.init_board(board.id)
             _ = match_service.set_players_order(match)
 
-            for player_i in match.players:
+            for player_i in players_in_match:
                 msg = {"key": "START_MATCH",
                        "payload": {}}
                 await manager.send_to_player(match_id, player_i.id, msg)
 
                 give_movement_card_to_player(player_i.id, db)
                 await give_shape_card_to_player(player_i.id, db, True)
-
+            
             background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
             return JSONResponse({"message": "Match started successfully"}, background=background_tasks)
 

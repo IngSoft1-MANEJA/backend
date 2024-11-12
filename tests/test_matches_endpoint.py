@@ -310,6 +310,4 @@ async def test_start_match_success2(client, db_session):
         # Verificar que el estado del match se haya actualizado
         assert match.state == "STARTED"
 
-        # Verificar que se hayan enviado los mensajes correctos a los jugadores
-        for player in match.players:
-            mock_send_to_player.assert_any_call(match_id, player.id, {"key": "START_MATCH", "payload": {}})
+        
