@@ -93,7 +93,18 @@ class ConnectionManager:
             except IndexError:
                 # La conexión ya no existe, salir del bucle
                 break
+        while True:
+            try:
+                response = await self._connections[index]["websocket"].receive_json()
+            except IndexError:
+                # La conexión ya no existe, salir del bucle
+                break
 
+            if response["key"] == "FILTER_MATCHES":
+                if "match_name" in response["payload"]:
+                    self._connections[index]["match_name"] = response["payload"]["match_name"]
+                if "max_players" in response["payload"]:
+                    self._connections[index]["max_players"] = response["payload"]["max_players"]
             if response["key"] == "FILTER_MATCHES":
                 if "match_name" in response["payload"]:
                     self._connections[index]["match_name"] = response["payload"]["match_name"]

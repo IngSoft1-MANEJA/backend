@@ -1,8 +1,12 @@
-import asyncio
-import copy
+from asyncio import sleep
+from copy import copy
+from datetime import datetime, timedelta
+from random import randint
+from typing import Optional
+import os
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
@@ -17,15 +21,8 @@ from app.database import get_db
 from app.exceptions import *
 from app.logger import logging
 from app.models import enums
-from app.models.enums import Colors, EasyShapes, HardShapes, ReasonWinning
-from app.models.models import Matches, Players, ShapeCards
-from app.routers.matches import (
-    give_movement_card_to_player,
-    give_shape_card_to_player,
-    notify_all_players_movements_received,
-    notify_matches_list,
-    notify_movement_card_to_player,
-)
+from app.models.enums import EasyShapes, HardShapes, ReasonWinning
+from app.models.models import Matches, Players
 from app.schemas import MatchOut, PartialMove, UseFigure
 from app.utils.board_shapes_algorithm import (
     Coordinate,
@@ -51,6 +48,123 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/matches")
 
 
+async def notify_matches_list(db):
+    try:
+        for conn in manager._connections:
+            filtered_matches = on_filter_matches(conn["match_name"], 
+                                                 conn["max_players"], db)
+            matches = [MatchOut.model_validate(match).model_dump() 
+                    for match in filtered_matches]
+            msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+            await conn["websocket"].send_json(msg)
+        
+    except Exception as e:
+        logger.error("Error al enviar mensaje: %s", e)
+
+
+def on_filter_matches(
+    match_name: Optional[str],
+    max_players: Optional[int],
+    db: Session
+):
+    """
+        Obtiene todas las partidas que coincidan con los filtros, si no tiene
+        filtros devuelve todas las partidas disponibles.
+        Args:
+            - s : string a buscar en el nombre de la partida.
+            - max_players : cantidad máxima de jugadores en la partida.
+            - db : Session de la base de datos.
+        Returns:
+            - Lista de partidas en esquema MatchOut.
+    """
+    matches = MatchService(db).get_all_matches(True)
+
+    if not match_name and not max_players:
+        return matches
+
+    filtered_matches = matches
+    if match_name:
+        filtered_matches = [
+            match for match in filtered_matches if match_name.lower() in match.match_name.lower()]
+    if max_players:
+        filtered_matches = [
+            match for match in filtered_matches if match.max_players == max_players]
+
+    return filtered_matches
+
+
+def give_movement_card_to_player(player_id: int, db: Session) -> list[tuple[int, str]]:
+    """
+    Da hasta 3 cartas de movimiento al jugador.
+    Args:
+        - player_id : id del jugador.
+        - db : Session de la base de datos.
+    Returns:
+        Lista de cartas dadas al jugador.
+    """
+    player_service = PlayerService(db)
+    movement_service = MovementCardService(db)
+
+    player = player_service.get_player_by_id(player_id)
+    match_id = player.match_id
+    list_movs = player.movement_cards
+    movs_to_give = 3 - len(list_movs)
+    movements_given = []
+
+    while movs_to_give > 0:
+        movements = movement_service.get_movement_cards_without_owner(match_id)
+        if not movements:
+            break  # No hay más cartas en el mazo
+        movement = movements[randint(0, len(movements) - 1)]
+        movement_service.add_movement_card_to_player(player_id, movement.id)
+        movements_given.append((movement.id, movement.mov_type))
+        movs_to_give -= 1
+
+    return movements_given
+
+
+async def notify_movement_card_to_player(player_id: int, match_id: int, buff_movement: list[tuple[int, str]]):
+    """
+        Notifica al jugador que se le dio una carta de movimiento.
+        Args:
+            - player_id : id del jugador.
+            - match_id : id de la partida.
+            - buff_movement : lista de tuplas con el id y tipo de movimiento.
+        Returns:
+            None, se comunica mediante websockets.
+    """
+    msg_user = {"key": "GET_MOVEMENT_CARD",
+                "payload": {"movement_card": buff_movement}}
+    await manager.send_to_player(match_id, player_id, msg_user)
+
+
+async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
+    """
+        Da hasta 3 cartas de figuras al jugador.
+        Args:
+            - player_id : id del jugador.
+            - db : Session de la base de datos.
+            - is_init : booleano que indica si es el inicio de la partida.
+    """
+    player = PlayerService(db).get_player_by_id(player_id)
+    visible_cards = ShapeCardService(db).get_visible_cards(player_id, True)
+    ShapeDeck = ShapeCardService(db).get_visible_cards(player_id, False)
+    CardsToGive = 3 - len(visible_cards)
+    ShapesGiven = []
+
+    for i in range(CardsToGive):
+        if not ShapeDeck:
+            break  # No hay más cartas en el mazo
+        shape = ShapeDeck.pop(randint(0, len(ShapeDeck) - 1))
+        ShapeCardService(db).update_shape_card(shape.id, True, "NOT_BLOCKED")
+        ShapesGiven.append((shape.id, shape.shape_type))
+
+    if not is_init:
+        msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
+                   "payload": [{"player": player.player_name, "turn_order": player.turn_order, "shape_cards": ShapesGiven}]}
+        await manager.broadcast_to_game(player.match_id, msg_all)
+
+
 async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
     match_service = MatchService(db)
     player_service = PlayerService(db)
@@ -70,7 +184,7 @@ async def playerWinner(match_id: int, reason: ReasonWinning, db: Session):
         await manager.broadcast_to_game(match_id, msg)
     except RuntimeError as e:
         # Manejar el caso en que el WebSocket ya esté cerrado
-        print(f"Error al enviar mensaje: {e}")
+        logger.error("Error al enviar mensaje: %s", e)
 
 
 async def player_winner_by_no_shapes(
@@ -172,6 +286,106 @@ async def owner_leave(owner: Players, match: Matches, db: Session):
     return {"message": "The match has been canceled because the owner has left."}
 
 
+async def turn_timeout(match_id: int, db: Session, turn_order: int, background_tasks):
+    match_service = MatchService(db)
+    timer = int(os.getenv("TURN_TIMER"))
+    await sleep(timer)
+    match = match_service.get_match_by_id(match_id)
+    logger.info("timestamp DB: %s", match.started_turn_time)
+    logger.info("Now: %s", datetime.now())
+    logger.info("Turn order DB: %s", turn_order)
+    logger.info("Turn order: %s", turn_order)
+    if match is not None and match.current_player_turn == turn_order and datetime.now() - match.started_turn_time >= timedelta(seconds=timer-1):
+        logger.info("IF Timeout")
+        movement_card_service = MovementCardService(db)
+        tile_service = TileService(db)
+        board_service = BoardService(db)
+        player_service = PlayerService(db)
+        shape_card_service = ShapeCardService(db)
+
+        try:
+            player = player_service.get_player_by_turn(turn_order, match_id)
+            match = MatchService(db).get_match_by_id(match_id)
+            board = board_service.get_board_by_match_id(match_id)
+        except Exception as e:
+            logger.error(e)
+            return None
+        movements = []
+        tiles = []
+        for _ in range(len(board.temporary_movements)):
+            try:
+                last_movement = board_service.get_last_temporary_movements(
+                    board.id)
+            except NoResultFound as e:
+                logger.error(e)
+                return None
+
+            tile1 = last_movement.tile1
+            tile2 = last_movement.tile2
+
+            try:
+                movement = movement_card_service.get_movement_card_by_id(
+                    last_movement.id_mov)
+                movement_card_service.add_movement_card_to_player(player.id, movement.id)
+            except NoResultFound as e:
+                logger.error(e)
+                return None
+
+            movements.append((movement.id, movement.mov_type))
+            tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, {
+            "rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+            aux_tile = copy(tile1)
+
+            try:
+                tile_service.update_tile_position(
+                    tile1.id, tile2.position_x, tile2.position_y)
+                tile_service.update_tile_position(
+                    tile2.id, aux_tile.position_x, aux_tile.position_y)
+            except NoResultFound as e:
+                logger.error(e)
+                return None
+
+            await sleep(1)
+            msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
+            await manager.broadcast_to_game(match_id, msg)
+
+
+        next_player = end_turn_logic(player, match, db)
+        logger.info("Next Player turn: %s, %s", next_player.turn_order, next_player.player_name)
+        movements += give_movement_card_to_player(player.id, db)
+
+        await notify_movement_card_to_player(player.id, match_id, movements)
+        
+        cant_draw = False
+        cards = shape_card_service.get_shape_card_by_player(player.id)
+        for card in cards:
+            if card.is_blocked != "NOT_BLOCKED":
+                cant_draw = True
+        
+        if not cant_draw:
+            await give_shape_card_to_player(player.id, db, is_init=False)
+        else:
+            msg_all = {"key": "PLAYER_RECEIVE_SHAPE_CARD",
+                    "payload": [{"player": player.player_name, 
+                                    "turn_order": player.turn_order, 
+                                    "shape_cards": []}]}
+            await manager.broadcast_to_game(player.match_id, msg_all)
+        
+        msg = {
+            "key": "END_PLAYER_TURN",
+            "payload": {
+                "current_player_turn": player.turn_order,
+                "current_player_name": player.player_name,
+                "next_player_name": next_player.player_name,
+                "next_player_turn": next_player.turn_order,
+                "turn_started": match.started_turn_time.isoformat()
+            }
+        }
+        await manager.broadcast_to_game(match.id, msg)
+
+        background_tasks.add_task(turn_timeout, match_id, db, next_player.turn_order, background_tasks)
+
+
 @router.delete("/{match_id}/left/{player_id}")
 async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_db)):
     """
@@ -236,13 +450,16 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
         print(f"Error al enviar mensaje: {e}")
 
     if next_player:
+        db.refresh(match_to_leave)
         msg = {
             "key": "END_PLAYER_TURN",
             "payload": {
                 "current_player_name": player_name,
+                "current_player_turn": player_to_delete.turn_order,
                 "next_player_name": next_player.player_name,
                 "next_player_turn": next_player.turn_order,
-            },
+                "turn_started": match_to_leave.started_turn_time.isoformat()
+            }
         }
         await manager.broadcast_to_game(match_id, msg)
 
@@ -255,7 +472,7 @@ async def leave_player(player_id: int, match_id: int, db: Session = Depends(get_
 
 
 @router.patch("/{match_id}/end-turn/{player_id}", status_code=200)
-async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db)):
+async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db), background_tasks = BackgroundTasks()):
     movement_card_service = MovementCardService(db)
     board_service = BoardService(db)
     tile_service = TileService(db)
@@ -273,7 +490,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         board = board_service.get_board_by_match_id(match_id)
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Board not found")
-
+    
     movements = []
     tiles = []
     for _ in range(len(board.get_movs())):
@@ -294,11 +511,9 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
             raise HTTPException(status_code=404, detail=e)
 
         movements.append((movement.id, movement.mov_type))
-        tiles = [
-            {"rowIndex": tile1.position_x, "columnIndex": tile1.position_y},
-            {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y},
-        ]
-        aux_tile = copy.copy(tile1)
+        tiles = [{"rowIndex": tile1.position_x, "columnIndex": tile1.position_y}, 
+                 {"rowIndex": tile2.position_x, "columnIndex": tile2.position_y}]
+        aux_tile = copy(tile1)
 
         try:
             tile_service.update_tile_position(
@@ -310,7 +525,7 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
         except NoResultFound as e:
             raise HTTPException(status_code=404, detail=e)
 
-        await asyncio.sleep(1)
+        await sleep(1)
         msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
         await manager.broadcast_to_game(match_id, msg)
 
@@ -318,7 +533,6 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
     movements += give_movement_card_to_player(player_id, db)
 
     await notify_movement_card_to_player(player_id, match_id, movements)
-    await notify_all_players_movements_received(player, match)
 
     cant_draw = False
     cards = shape_card_service.get_shape_card_by_player(player_id)
@@ -348,9 +562,13 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db))
             "current_player_name": player.player_name,
             "next_player_name": next_player.player_name,
             "next_player_turn": next_player.turn_order,
-        },
+            "turn_started": match.started_turn_time.isoformat()
+        }
     }
     await manager.broadcast_to_game(match.id, msg)
+
+    background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
+    return JSONResponse(None, background=background_tasks)
 
 
 def validate_partial_move(partialMove: PartialMove, card_type: str):
@@ -451,7 +669,7 @@ async def partial_move(
         except NoResultFound:
             raise HTTPException(status_code=404, detail="Tile not found")
 
-        aux_tile = copy.copy(tile1)
+        aux_tile = copy(tile1)
         tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
         tile_service.update_tile_position(
             tile2.id, aux_tile.position_x, aux_tile.position_y
@@ -547,7 +765,7 @@ async def delete_partial_move(
     except NoResultFound:
         raise HTTPException(status_code=404, detail="Movement card not found")
 
-    aux_tile = copy.copy(tile1)
+    aux_tile = copy(tile1)
 
     try:
         tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
@@ -657,7 +875,7 @@ async def undo_partials_movements(
             )
         )
 
-        aux_tile = copy.copy(tile1)
+        aux_tile = copy(tile1)
         tile_service.update_tile_position(tile1.id, tile2.position_x, tile2.position_y)
         tile_service.update_tile_position(
             tile2.id, aux_tile.position_x, aux_tile.position_y
@@ -670,7 +888,7 @@ async def undo_partials_movements(
         for tiles_to_swap in tiles:
             msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles_to_swap}}
             await manager.broadcast_to_game(match_id, msg)
-            await asyncio.sleep(1)
+            await sleep(1)
 
     return movements
 
@@ -770,7 +988,7 @@ async def use_figure(
         },
     }
     await manager.broadcast_to_game(match_id, msg2)
-    await asyncio.sleep(1)
+    await sleep(1)
     await player_winner_by_no_shapes(player, match, db)
 
     figures_found = board_service.get_formed_figures(board.id)
@@ -921,7 +1139,7 @@ async def block_figure(
         },
     }
     await manager.broadcast_to_game(match_id, msg2)
-    await asyncio.sleep(1)
+    await sleep(1)        
 
     # Tenemos que mandar de nuevo la lista porque se actualiza el color prohibido.\
     board_service.update_ban_color(board.id, new_ban_color)

@@ -1,3 +1,6 @@
+from datetime import datetime
+from fastapi import (APIRouter, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends, HTTPException)
+from fastapi.responses import JSONResponse
 from random import randint, shuffle
 from typing import Annotated, Optional, Tuple
 from uuid import uuid4
@@ -14,7 +17,16 @@ from fastapi import (
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound
+from sqlalchemy.orm import Session
+from random import shuffle
 
+from app.routers.players import (give_movement_card_to_player,
+                                 give_shape_card_to_player,
+                                 notify_movement_card_to_player, 
+                                 on_filter_matches,
+                                 turn_timeout,
+                                 notify_matches_list)
+from app.cruds.board import BoardService
 from app.connection_manager import manager
 from app.cruds.board import BoardService
 from app.cruds.match import MatchService
@@ -333,7 +345,7 @@ async def give_shape_card_to_player(player_id: int, db: Session, is_init: bool):
 
 
 @router.patch("/{match_id}/start/{player_id}", status_code=200)
-async def start_match(match_id: int, player_id: int, db: Session = Depends(get_db)):
+async def start_match(match_id: int, player_id: int, db: Session = Depends(get_db), background_tasks = BackgroundTasks()):
     try:
         match_service = MatchService(db)
         match = match_service.get_match_by_id(match_id)
@@ -351,7 +363,8 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
 
         if player.is_owner and player.match_id == match_id:
             match.state = MatchState.STARTED.value
-            create_movement_deck(db, match_id)  # crea el mazo movs
+            match.started_turn_time = datetime.now()
+            movement_service.create_movement_deck(match_id)
 
             # ===================== Configuro los mazos ==================================
             shapes = [(shape.value, True) for shape in HardShapes] * 2
@@ -379,7 +392,8 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
                 give_movement_card_to_player(player_i.id, db)
                 await give_shape_card_to_player(player_i.id, db, True)
 
-            return {"message": "Match started successfully"}
+            background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
+            return JSONResponse({"message": "Match started successfully"}, background=background_tasks)
 
         raise HTTPException(status_code=404, detail="Match not found")
     except NoResultFound:
@@ -524,7 +538,7 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
         blocked_figures = ShapeCardService(db).get_blocked_cards(match_id)
 
     except Exception as e:
-        print(f"Error al obtener informacion de la partida: {e}")
+        logger.error("Error al obtener informacion de la partida: %s", e)
         raise HTTPException(
             status_code=404, detail="Error al obtener informacion de la partida"
         )
@@ -557,7 +571,8 @@ async def send_active_match_info(match_id: int, player_id: int, db: Session):
                 for opponent in players_in_match
                 if opponent.id != player_id
             ],
-        },
+            "turn_started": match.started_turn_time.isoformat()
+        }
     }
     await manager.send_to_player(match_id, player_id, msg_info)
 
