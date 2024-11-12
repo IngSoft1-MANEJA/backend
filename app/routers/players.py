@@ -638,7 +638,7 @@ async def partial_move(match_id: int, player_id: int, partialMove: PartialMove, 
         except NoResultFound:
             raise HTTPException(status_code=404, detail="Tile not found")
 
-        aux_tile = copy.copy(tile1)
+        aux_tile = copy(tile1)
         tile_service.update_tile_position(
             tile1.id, tile2.position_x, tile2.position_y)
         tile_service.update_tile_position(
