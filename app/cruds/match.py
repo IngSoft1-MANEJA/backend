@@ -1,5 +1,6 @@
-from copy import copy
+from datetime import datetime
 from random import shuffle
+from sqlalchemy import DateTime
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 from typing import List
@@ -18,7 +19,7 @@ class MatchService:
             db: La session de la base de datos."""
         self.db = db
 
-    def create_match(self, name: str, max_players: int, public: bool):
+    def create_match(self, name: str, max_players: int, public: bool, password: str):
         """
             Crea un nuevo match en la database.
 
@@ -33,7 +34,7 @@ class MatchService:
             utils.validate_match_name(name)
             utils.validate_max_players(max_players)
             match = Matches(match_name=name, max_players=max_players, 
-                            is_public=public, state = MatchState.WAITING.value, current_players=1)
+                            is_public=public, state = MatchState.WAITING.value, current_players=1, password=password)
             self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
@@ -110,7 +111,7 @@ class MatchService:
             raise NoResultFound("No matches found")
     
     
-    def update_match(self, match_id: int, new_state: str = None, new_amount_players: int = None):
+    def update_match(self, match_id: int, new_state: str = None, new_amount_players: int = None, new_started_turn_time: DateTime = None):
         """
             Actualiza los atributos de un match en la database.
 
@@ -127,7 +128,8 @@ class MatchService:
                 match.state = new_state
             if new_amount_players != None:
                 match.current_players = new_amount_players
-            # self.db.add(match)
+            if new_started_turn_time != None:
+                match.started_turn_time = new_started_turn_time
             self.db.commit()
             self.db.refresh(match)
         except NoResultFound:
@@ -158,7 +160,7 @@ class MatchService:
         try:
             match = self.db.query(Matches).filter(Matches.id == match_id).one()
             match.current_player_turn = turn
-            # self.db.add(match)
+            match.started_turn_time = datetime.now()
             self.db.commit()
             self.db.refresh(match)
         except NoResultFound:

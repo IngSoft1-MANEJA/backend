@@ -23,11 +23,10 @@ from app.database import Base, get_db
 from app.models.models import *
 from app.routers import matches, players
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-
 
 @pytest.fixture
 def db_session():
+    basedir = os.path.abspath(os.path.dirname(__file__))
     SQLALCHEMY_DATABASE_URL = "sqlite:///tests/test_db.sqlite"
     engine = create_engine(SQLALCHEMY_DATABASE_URL, echo=False)
     Base.metadata.create_all(bind=engine, checkfirst=True)
@@ -43,13 +42,14 @@ def db_session():
 
 @pytest.fixture
 def app(db_session):
+    os.environ["TURN_TIMER"] = "1"
 
     def override_get_db():
         try:
             yield db_session
         finally:
             db_session.close()
-
+    
     app = FastAPI()
 
     origins = ["*"]
@@ -69,6 +69,27 @@ def app(db_session):
 
     app.dependency_overrides.clear()
 
+
+@pytest.fixture
+@patch.object(MatchService, "get_match_by_id")
+@patch.object(MatchService, "get_all_matches")
+@patch.object(MatchService, "create_match")
+@patch.object(MatchService, "delete_match")
+@patch.object(MatchService, "get_match_id")
+@patch.object(MatchService, "set_players_order")
+@patch.object(MatchService, "update_match")
+@patch.object(MatchService, "update_turn")
+def match_mocks(mock1, mock2, mock3, mock4, mock5, mock6, mock7, mock8):
+    return {
+    "get_match_by_id": mock1,
+    "get_all_matches": mock2,
+    "create_match": mock3,
+    "delete_match": mock4,
+    "get_match_id": mock5,
+    "set_players_order": mock6,
+    "update_match": mock7,
+    "update_turn": mock8
+}
 
 @pytest.fixture
 def manager():
@@ -124,7 +145,7 @@ def load_matches(db_session):
                 Players(player_name="Player 1", is_owner=True, match_id=1, session_token=""), Players(player_name="Player 2", is_owner=False, match_id=1, session_token="")
             ]),
         Matches(match_name="Match 2", max_players=2, is_public=True, state="STARTED", current_players=2),
-        Matches(match_name="Match 3", max_players=4, is_public=True, state="WAITING", current_players=1, players=[
+        Matches(match_name="Match 3", max_players=4, is_public=False, password="AAA", state="WAITING", current_players=1, players=[
                 Players(player_name="Player 3", is_owner=True, match_id=3, session_token="")
             ])
     ]
@@ -169,21 +190,21 @@ def load_data_for_test(db_session):
     ]
     list_shape_cards = [
         {'player_owner': 1, 'shape_type': 1, 'is_hard': True,
-            'is_visible': False, 'is_blocked': False},
+            'is_visible': False, 'is_blocked': "NOT_BLOCKED"},
         {'player_owner': 1, 'shape_type': 2, 'is_hard': True,
-            'is_visible': False, 'is_blocked': False},
+            'is_visible': False, 'is_blocked': "NOT_BLOCKED"},
         {'player_owner': 2, 'shape_type': 3, 'is_hard': True,
-            'is_visible': False, 'is_blocked': False},
+            'is_visible': False, 'is_blocked': "NOT_BLOCKED"},
         {'player_owner': 2, 'shape_type': 2, 'is_hard': True,
-            'is_visible': False, 'is_blocked': False},
+            'is_visible': False, 'is_blocked': "NOT_BLOCKED"},
         {'player_owner': 3, 'shape_type': 2, 'is_hard': True,
-            'is_visible': False, 'is_blocked': False},
+            'is_visible': False, 'is_blocked': "NOT_BLOCKED"},
         {'player_owner': 4, 'shape_type': 6, 'is_hard': True,
-            'is_visible': False, 'is_blocked': False},
+            'is_visible': False, 'is_blocked': "NOT_BLOCKED"},
         {'player_owner': 5, 'shape_type': 6, 'is_hard': True,
-            'is_visible': False, 'is_blocked': False},
+            'is_visible': False, 'is_blocked': "NOT_BLOCKED"},
         {'player_owner': 6, 'shape_type': 4, 'is_hard': True,
-            'is_visible': False, 'is_blocked': False},
+            'is_visible': False, 'is_blocked': "NOT_BLOCKED"},
     ]
     list_movement_cards = [
         {'matchId': 1, 'player_owner': 1, 'movement': 'Inverse L'},
