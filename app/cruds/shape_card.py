@@ -2,7 +2,7 @@ from typing import List
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import NoResultFound
 
-from app.models.models import ShapeCards
+from app.models.models import Players, ShapeCards
 from app.models.enums import IsBlocked
 from app.utils.utils import validate_shape, validate_add_shape_card_to_hand
 
@@ -34,7 +34,7 @@ class ShapeCardService():
         """
         validate_shape(shape)
         shape_card = ShapeCards(shape_type=shape, is_hard=is_hard, is_visible=is_visible,
-                                is_blocked= IsBlocked.NOT_BLOCKED.name, player_owner=player_owner)
+                                is_blocked=IsBlocked.NOT_BLOCKED.name, player_owner=player_owner)
         self.db.add(shape_card)
         self.db.commit()
         self.db.refresh(shape_card)
@@ -157,13 +157,15 @@ class ShapeCardService():
                 - is_visible : booleano que indica si las cartas deseadas son visibles o no.
         """
         try:
-            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(ShapeCards.is_visible == is_visible).all()
+            cards = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).filter(
+                ShapeCards.is_visible == is_visible).all()
             return cards
-        
+
         # REVISAR CUANDO SEA 0
         except NoResultFound:
-            raise NoResultFound(f"Player with id {player_id} has not visible cards")
-    
+            raise NoResultFound(
+                f"Player with id {player_id} has not visible cards")
+
     def get_deck_size(self, player_id: int) -> int:
         """
             Obtiene el tamaÃ±o del mazo de un jugador.
@@ -171,7 +173,32 @@ class ShapeCardService():
                 - player_id : id del jugador.
         """
         try:
-            deck_size = self.db.query(ShapeCards).filter(ShapeCards.player_owner == player_id).count()
+            deck_size = self.db.query(ShapeCards).filter(
+                ShapeCards.player_owner == player_id).count()
             return deck_size
         except NoResultFound:
-            raise NoResultFound(f"Player with id {player_id} has not shape cards")
+            raise NoResultFound(
+                f"Player with id {player_id} has not shape cards")
+
+    def get_blocked_cards(self, match_id: int) -> List[int]:
+        """
+            Devuelve el id de todas las cartas bloqueadas del match
+            Args:
+                - match_id : id del match
+        """
+        try:
+            # Obtener todos los jugadores del match
+            players = self.db.query(Players.id).filter(Players.match_id == match_id).all()
+            player_ids = [player.id for player in players]
+            
+            # Obtener todas las cartas bloqueadas de esos jugadores
+            cards = self.db.query(ShapeCards).filter(
+                ShapeCards.player_owner.in_(player_ids),
+                ShapeCards.is_blocked == IsBlocked.BLOCKED.name
+            ).all()
+            
+            # Solo necesitamos los ids
+            id_cards = [card.id for card in cards]
+            return id_cards
+        except NoResultFound:
+            return []

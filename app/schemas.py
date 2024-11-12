@@ -13,7 +13,6 @@ class MatchCreateIn(BaseModel):
     password: str = ""
     max_players: int
     player_name: str
-    token: str
 
 
     @field_validator("password")
@@ -100,6 +99,7 @@ class PlayerJoinIn(BaseModel):
 class PlayerJoinOut(BaseModel):
     player_id: int
     players: list[str]
+    token: str
 
 
 class Tile(BaseModel):
