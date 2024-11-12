@@ -34,6 +34,7 @@ class Matches(Base):
     match_name: Mapped[str] = mapped_column(String(50))
     state: Mapped[str]
     is_public: Mapped[bool] = mapped_column(Boolean)
+    password: Mapped[str] = mapped_column(String(50), nullable=True)
     current_players: Mapped[int] = mapped_column(Integer)
     max_players: Mapped[int] = mapped_column(Integer)
     current_player_turn: Mapped[int] = mapped_column(Integer, default=0)

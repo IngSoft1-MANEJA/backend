@@ -23,7 +23,7 @@ def test_get_matches(match_service: MatchService, db_session):
 
 
 def test_delete_match(match_service: MatchService, db_session):
-    match = match_service.create_match('Test Match', 4, public=True)
+    match = match_service.create_match('Test Match', 4, public=True, password=False)
     number_matches = db_session.query(Matches).count()
     match_id = match_service.get_match_id(match)
     match_service.delete_match(match_id)
@@ -33,14 +33,13 @@ def test_delete_match(match_service: MatchService, db_session):
 
 def test_create_match(match_service: MatchService, db_session):
     number_matches = db_session.query(Matches).count()
-    match_service.create_match('Test Match', 4, public=True)
+    match_service.create_match('Test Match', 4, public=True, password=False)
     new_number_matches = db_session.query(Matches).count()
-
     assert new_number_matches == number_matches + 1
 
 
 def test_get_match_id(match_service: MatchService, db_session):
-    match = match_service.create_match('Test-Match-Id', 4, public=True)
+    match = match_service.create_match('Test-Match-Id', 4, public=True, password=False)
     # Obtener el ID del match recién creado
     match_id = db_session.query(Matches).filter(
         Matches.match_name == 'Test-Match-Id').first().id
@@ -51,7 +50,7 @@ def test_get_match_id(match_service: MatchService, db_session):
 
 
 def test_get_match_by_id(match_service: MatchService):
-    match = match_service.create_match('Test-Match-Id', 4, public=True)
+    match = match_service.create_match('Test-Match-Id', 4, public=True, password=False)
     # Obtener el ID del match recién creado
     match_id = match_service.get_match_id(match)
     # Obtener el match usando el servicio
@@ -61,7 +60,7 @@ def test_get_match_by_id(match_service: MatchService):
 
 
 def test_update_match(match_service: MatchService):
-    match = match_service.create_match('Test-Match-Update', 4, public=True)
+    match = match_service.create_match('Test-Match-Update', 4, public=True, password=False)
     # Obtener el ID del match recién creado
     match_id = match_service.get_match_id(match)
     # Actualizar el match
@@ -75,7 +74,7 @@ def test_update_match(match_service: MatchService):
 
 def test_update_turn_success(match_service: MatchService, db_session):
     # Crear un match para la prueba
-    match_service.create_match('test_match', 4, True)
+    match_service.create_match('test_match', 4, True, password=False)
     match = db_session.query(Matches).filter(Matches.match_name == 'test_match').one()
     
     # Actualizar el turno del match

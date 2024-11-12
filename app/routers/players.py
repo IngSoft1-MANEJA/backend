@@ -22,7 +22,7 @@ from app.exceptions import *
 from app.logger import logging
 from app.models import enums
 from app.models.enums import EasyShapes, HardShapes, ReasonWinning
-from app.models.models import Matches, Players
+from app.models.models import Matches, Players, ShapeCards
 from app.schemas import MatchOut, PartialMove, UseFigure
 from app.utils.board_shapes_algorithm import (
     Coordinate,
@@ -348,6 +348,10 @@ async def turn_timeout(match_id: int, db: Session, turn_order: int, background_t
             msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
             await manager.broadcast_to_game(match_id, msg)
             await sleep(1)
+            formed_figures = board_service.get_formed_figures(match.board.id)
+            allow_figures_event = filter_allowed_figures(
+                match_id, board_service, formed_figures, tile_service)
+            await manager.broadcast_to_game(match_id, allow_figures_event)
 
         next_player = end_turn_logic(player, match, db)
         logger.info("Next Player turn: %s, %s", next_player.turn_order, next_player.player_name)
@@ -528,6 +532,12 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
         await manager.broadcast_to_game(match_id, msg)
         await sleep(1)
 
+        formed_figures = board_service.get_formed_figures(match.board.id)
+        allow_figures_event = filter_allowed_figures(
+            match_id, board_service, formed_figures, tile_service)
+        await manager.broadcast_to_game(match_id, allow_figures_event)
+
+
     next_player = end_turn_logic(player, match, db)
     movements += give_movement_card_to_player(player_id, db)
 
@@ -700,19 +710,13 @@ async def partial_move(
         ]
         msg = {"key": "PLAYER_RECEIVE_NEW_BOARD", "payload": {"swapped_tiles": tiles}}
         await manager.broadcast_to_game(match_id, msg)
+        
+        formed_figures = board_service.get_formed_figures(match.board.id)
 
-        # Send Info about figures coordinates
-        board_figures = None
-        try:
-            match = MatchService(db).get_match_by_id(match_id)
-            board_figures = BoardService(db).get_formed_figures(match.board.id)
-        except Exception:
-            raise HTTPException(status_code=500, detail="Error with formed figures")
-
-        board_figures = board_service.get_formed_figures(match_id)
+        logger.info("nuevas figuras formadas %s", formed_figures)
+        
         allow_figures_event = filter_allowed_figures(
-            match_id, board_service, board_figures, tile_service
-        )
+            match_id, board_service, formed_figures, tile_service)
         await manager.broadcast_to_game(match_id, allow_figures_event)
 
     else:
@@ -892,6 +896,17 @@ async def undo_partials_movements(
     return movements
 
 
+async def unlock_figures(shape_card: ShapeCards, player_id, match_id, db):
+    shape_card_service = ShapeCardService(db)
+    visible_cards = shape_card_service.get_visible_cards(player_id, True)
+    if shape_card.is_blocked == "NOT_BLOCKED":
+        for card in visible_cards:
+            if card.is_visible == True and card.is_blocked == "BLOCKED" and len(visible_cards) == 2:
+                shape_card_service.update_shape_card(card.id, True, "UNLOCKED")
+                msg = {"key": "UNLOCK_FIGURE", "payload": { "figure_id": card.id }}
+                await manager.broadcast_to_game(match_id, msg)
+
+
 @router.post("/{match_id}/player/{player_id}/use-figure", status_code=200)
 async def use_figure(
     match_id: int, player_id: int, request: UseFigure, db: Session = Depends(get_db)
@@ -972,6 +987,7 @@ async def use_figure(
             request.figure_id
         ).shape_type
         movements = await undo_partials_movements(board, player_id, match_id, db)
+        await unlock_figures(shape_card, player_id, match_id, db)
         shape_card_service.delete_shape_card(request.figure_id)
 
     except NoResultFound:
@@ -1068,7 +1084,12 @@ async def block_figure(
         raise HTTPException(status_code=404, detail="Figure Card not found")
 
     players = player_service.get_players_by_match(match_id)
-    player_owner = player_service.get_player_by_id(shape_card.player_owner)
+    
+    try:
+        player_owner = player_service.get_player_by_id(shape_card.player_owner)
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Player doesnt exist")
+
     if not shape_card.is_visible or player_owner not in players:
         raise HTTPException(
             status_code=404, detail="Figure card doesn't belong to this match"

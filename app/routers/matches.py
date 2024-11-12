@@ -71,6 +71,7 @@ async def create_websocket(websocket: WebSocket, db: Session = Depends(get_db)):
         logger.error("Error al enviar mensaje: %s", e)
 
 
+
 @router.websocket("/{game_id}/ws/{player_id}")
 async def create_websocket_connection(
     game_id: int, player_id: int, websocket: WebSocket, db: Session = Depends(get_db)
@@ -169,13 +170,73 @@ def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Match not found")
 
 
-@router.post("/", status_code=200)
+async def notify_matches_list(db):
+    try:
+        for conn in manager._connections:
+            filtered_matches = on_filter_matches(
+                conn["match_name"], conn["max_players"], db
+            )
+            matches = [
+                MatchOut.model_validate(match).model_dump()
+                for match in filtered_matches
+            ]
+            msg = {"key": "MATCHES_LIST", "payload": {"matches": matches}}
+            await conn["websocket"].send_json(msg)
+
+    except Exception as e:
+        logger.error("Error al enviar mensaje: %s", e)
+
+
+def on_filter_matches(
+    match_name: Optional[str], max_players: Optional[int], db: Session
+):
+    """
+    Obtiene todas las partidas que coincidan con los filtros, si no tiene
+    filtros devuelve todas las partidas disponibles.
+    Args:
+        - s : string a buscar en el nombre de la partida.
+        - max_players : cantidad máxima de jugadores en la partida.
+        - db : Session de la base de datos.
+    Returns:
+        - Lista de partidas en esquema MatchOut.
+    """
+    matches = MatchService(db).get_all_matches(True)
+
+    if not match_name and not max_players:
+        return matches
+
+    filtered_matches = matches
+    if match_name:
+        filtered_matches = [
+            match
+            for match in filtered_matches
+            if match_name.lower() in match.match_name.lower()
+        ]
+    if max_players:
+        filtered_matches = [
+            match for match in filtered_matches if match.max_players == max_players
+        ]
+
+    return filtered_matches
+
+
+@router.get("/{match_id}", response_model=MatchOut)
+def get_match_by_id(match_id: int, db: Session = Depends(get_db)):
+    try:
+        match_service = MatchService(db)
+        match = match_service.get_match_by_id(match_id)
+        return match
+    except:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+
+@router.post("/", status_code=201)
 async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     match_service = MatchService(db)
     player_service = PlayerService(db)
-
+    logger.info(match)
     match1 = match_service.create_match(
-        match.lobby_name, match.max_players, match.is_public
+        match.lobby_name, match.max_players, match.is_public, match.password
     )
     token = str(uuid4())
     new_player = player_service.create_player(match.player_name, match1.id, True, token)
@@ -186,18 +247,15 @@ async def create_match(match: MatchCreateIn, db: Session = Depends(get_db)):
     return {"player_id": new_player.id, "match_id": match1.id, "token": token}
 
 
-@router.post(
-    "/{match_id}",
-    status_code=200,
-    response_model=PlayerJoinOut,
-    responses={
-        404: {"description": "Match not found"},
-        409: {"description": "Match is full"},
-    },
-)
-async def join_player_to_match(
-    match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)
-):
+@router.post("/{match_id}", status_code=200,
+             response_model=PlayerJoinOut,
+             responses= {
+                 401: {"description": "password is incorrect"},
+                 404: {"description": "Match not found"},
+                 409: {"description": "Match is full"}
+                 }
+            )
+async def join_player_to_match(match_id: int, playerJoinIn: PlayerJoinIn, db: Session = Depends(get_db)):
     """
     Create a player and add them to the match.
     """
@@ -211,6 +269,9 @@ async def join_player_to_match(
 
     if match.current_players >= match.max_players:
         raise HTTPException(status_code=409, detail="Match is full")
+
+    if match.password != playerJoinIn.password:
+        raise HTTPException(status_code=401, detail="password is incorrect")
 
     player_token = str(uuid4())
     player = player_service.create_player(
@@ -371,8 +432,10 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             shapes += [(shape.value, False) for shape in EasyShapes] * 2
             shuffle(shapes)
 
+            players_in_match = player_service.get_players_by_match(match_id)
             # Crea el mazo de figuras para cada jugador
-            for player in match.players:
+            for player in players_in_match:
+                print(player.id)
                 for _ in range(int(MAX_SHAPE_CARDS / match.max_players)):
                     shape = shapes.pop()
                     shape_service.create_shape_card(
@@ -385,13 +448,14 @@ async def start_match(match_id: int, player_id: int, db: Session = Depends(get_d
             board_service.init_board(board.id)
             _ = match_service.set_players_order(match)
 
-            for player_i in match.players:
-                msg = {"key": "START_MATCH", "payload": {}}
+            for player_i in players_in_match:
+                msg = {"key": "START_MATCH",
+                       "payload": {}}
                 await manager.send_to_player(match_id, player_i.id, msg)
 
                 give_movement_card_to_player(player_i.id, db)
                 await give_shape_card_to_player(player_i.id, db, True)
-
+            
             background_tasks.add_task(turn_timeout, match_id, db, match.current_player_turn, background_tasks)
             return JSONResponse({"message": "Match started successfully"}, background=background_tasks)
 

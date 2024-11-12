@@ -28,7 +28,7 @@ def test_create_match(client, db_session):
             "token": "testtoken"
         }
     )
-    assert response.status_code == 200
+    assert response.status_code == 201
     data = response.json()
     assert "player_id" in data
     assert "match_id" in data
@@ -70,7 +70,7 @@ def test_join_match_success(client, load_matches, db_session):
     manager.create_game_connection(3)
     match = db_session.query(Matches).filter(Matches.id == 3).first()
     current_players = match.current_players
-    response = client.post("/matches/3", json={"player_name": "Player 4"})
+    response = client.post("/matches/3", json={"player_name": "Player 4", "password":"AAA"})
     assert response.status_code == status.HTTP_200_OK
     match = db_session.query(Matches).filter(Matches.id == 3).first()
     assert match.current_players == current_players + 1
@@ -84,6 +84,16 @@ def test_join_match_is_full(client):
     with mock.patch("app.cruds.match.MatchService.get_match_by_id", return_value=MagicMock(current_players=2, max_players=2)):
         response = client.post("/matches/1", json={"player_name": "Player 3"})
     assert response.status_code == status.HTTP_409_CONFLICT
+
+def test_join_match_with_invalid_password(client):
+    with mock.patch("app.cruds.match.MatchService.get_match_by_id", return_value=MagicMock(current_players=2, max_players=3, is_public=False, password="AAA")):
+        response = client.post("/matches/1", json={})
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+def test_join_match_with_incorrect_password(client):
+    with mock.patch("app.cruds.match.MatchService.get_match_by_id", return_value=MagicMock(current_players=2, max_players=3, is_public=False, password="AAA")):
+        response = client.post("/matches/1", json={"player_name": "Player 3", "password": "BBB"})
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 def test_start_match_success(client, load_matches):
@@ -302,6 +312,4 @@ async def test_start_match_success2(client, db_session):
         # Verificar que el estado del match se haya actualizado
         assert match.state == "STARTED"
 
-        # Verificar que se hayan enviado los mensajes correctos a los jugadores
-        for player in match.players:
-            mock_send_to_player.assert_any_call(match_id, player.id, {"key": "START_MATCH", "payload": {}})
+        

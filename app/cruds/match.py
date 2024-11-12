@@ -19,7 +19,7 @@ class MatchService:
             db: La session de la base de datos."""
         self.db = db
 
-    def create_match(self, name: str, max_players: int, public: bool):
+    def create_match(self, name: str, max_players: int, public: bool, password: str):
         """
             Crea un nuevo match en la database.
 
@@ -34,7 +34,7 @@ class MatchService:
             utils.validate_match_name(name)
             utils.validate_max_players(max_players)
             match = Matches(match_name=name, max_players=max_players, 
-                            is_public=public, state = MatchState.WAITING.value, current_players=1)
+                            is_public=public, state = MatchState.WAITING.value, current_players=1, password=password)
             self.db.add(match)
             self.db.commit()
             self.db.refresh(match)
