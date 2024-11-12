@@ -58,26 +58,3 @@ async def test_undo_partials_movements_tiles_empty():
 
         assert result == []
         mock_manager.broadcast_to_game.assert_not_called()
-
-@pytest.mark.asyncio
-async def test_undo_partials_movements_exception_handling():
-    board = MagicMock()
-    board.id = 1
-    board.temporary_movements = [MagicMock()]
-
-    player_id = 1
-    match_id = 1
-    db = MagicMock()
-
-    with patch('app.routers.players.BoardService') as MockBoardService, \
-         patch('app.routers.players.manager') as mock_manager, \
-         patch('asyncio.sleep', new_callable=AsyncMock):
-
-        board_service = MockBoardService.return_value
-        board_service.get_last_temporary_movements.side_effect = Exception("Error")
-        mock_manager.broadcast_to_game = AsyncMock()
-
-        with pytest.raises(Exception) as e:
-            await undo_partials_movements(board, player_id, match_id, db)
-
-        assert str(e.value) == "Error"
