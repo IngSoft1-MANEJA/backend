@@ -32,6 +32,7 @@ def test_create_match(client, db_session):
     data = response.json()
     assert "player_id" in data
     assert "match_id" in data
+    assert "token" in data
 
     # Verifica que el match y el player se hayan creado en la base de datos
     match = db_session.query(Matches).filter(
@@ -47,7 +48,7 @@ def test_create_match(client, db_session):
     assert player.player_name == "Test Player"
     assert player.match_id == match.id
     assert player.is_owner is True
-    assert player.session_token == "testtoken"
+    assert player.session_token == data["token"]
 
 
 def test_create_match_invalid_data(client):
@@ -213,6 +214,7 @@ async def test_get_match_info_to_player(client, db_session):
     shape_cards = [MagicMock(id=1, shape_type="circle")]
     movement_cards = [MagicMock(id=1, mov_type="move")]
     board_figures = [MagicMock(id=1, figure_type="triangle")]
+    
 
     with patch('app.routers.matches.MatchService.get_match_by_id', return_value=match), \
          patch('app.routers.matches.PlayerService.get_player_by_id', return_value=player), \
