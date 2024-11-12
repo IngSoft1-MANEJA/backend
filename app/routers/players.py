@@ -522,6 +522,12 @@ async def end_turn(match_id: int, player_id: int, db: Session = Depends(get_db),
         msg = {"key": "UNDO_PARTIAL_MOVE", "payload": {"tiles": tiles}}
         await manager.broadcast_to_game(match_id, msg)
 
+        await sleep(1)
+        formed_figures = board_service.get_formed_figures(match.board.id)
+        allow_figures_event = filter_allowed_figures(
+            match_id, board_service, formed_figures, tile_service)
+        await manager.broadcast_to_game(match_id, allow_figures_event)
+
     next_player = end_turn_logic(player, match, db)
     movements += give_movement_card_to_player(player_id, db)
 
